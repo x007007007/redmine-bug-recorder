@@ -1,169 +1,136 @@
-// DevTools「Bug Recorder」面板:时间轴缩略图(点击定位大步骤/选范围)、大步骤分页列表、
-// 选区一键交给提交页。复用 manager/api 与 shared 模块,UI 保持紧凑。
+// DevTools「Bug Recorder」面板:会话列表(切换/删除)、时间轴缩略图、大步骤勾选
+//(与提交页经 storage.session 实时同步)、选范围提交。
 
 import { send } from '../manager/api';
 import { $ } from '../manager/dom';
-import { buildPages } from '../shared/timeline';
-import { describeAction } from '../shared/describe';
-import { renderPages, PAGE_SIZE, clockOf, type PageRow } from './panel-pages';
-import type { PageGroup, SessionDetail, StateInfo, SubmitRange } from '../shared/types';
-
-const panelState: {
-  recording: boolean;
-  sessionId: string | null;
-  cache: SessionDetail | null;
-  pages: PageGroup[];
-  pageIdx: number;
-  highlightKey: string | null;
-  rangeMode: boolean;
-  rangeFromTs: number | null;
-  range: SubmitRange | null;
-} = {
-  recording: false,
-  sessionId: null,
-  cache: null,
-  pages: [],
-  pageIdx: 0,
-  highlightKey: null,
-  rangeMode: false,
-  rangeFromTs: null,
-  range: null,
-};
+import { renderSessions } from './panel-sessions';
+import { panelState } from './panel-state';
+import {
+  bindView,
+  clearRange,
+  locate,
+  onThumbClick,
+  rebuildPages,
+  renderPagesPage,
+  renderTimeline,
+  setPage,
+  submitRangeUi,
+  updateSelSummary,
+} from './panel-view';
+import type { SessionSummary, StateInfo, SubmitRange } from '../shared/types';
 
 function init(): void {
   $('btnToggle').addEventListener('click', () => {
     void (async () => {
       const st = await send({ type: 'GET_STATE' });
       await send({ type: st.recording ? 'STOP_RECORDING' : 'START_RECORDING' });
+      panelState.sessionId = null; // 回到录制中的会话
       await refreshState();
     })();
   });
-  $('btnOpenMgr').addEventListener('click', () => {
-    const url = chrome.runtime.getURL('manager/manager.html');
-    try {
-      void chrome.tabs.create({ url });
-    } catch {
-      window.open(url, '_blank');
-    }
-  });
+  $('btnOpenMgr').addEventListener('click', openManager);
   $('rangeMode').addEventListener('change', () => {
     panelState.rangeMode = ($('rangeMode') as HTMLInputElement).checked;
-    if (!panelState.rangeMode) clearRange();
-    else $('rangeInfo').textContent = '依次点击两张截图:第一张为起点,第二张为终点';
+    clearRange();
   });
   $('btnClearRange').addEventListener('click', clearRange);
-  $('btnSubmitRange').addEventListener('click', () => void submitRange());
+  $('btnSubmitRange').addEventListener('click', submitRangeUi);
   $('pgPrev').addEventListener('click', () => setPage(panelState.pageIdx - 1));
   $('pgNext').addEventListener('click', () => setPage(panelState.pageIdx + 1));
   chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
     if (msg && msg.type === 'SESSION_UPDATED') void refreshState();
   });
+  // 提交页(或其它入口)改了勾选 → 这里实时采纳
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    const sid = panelState.sessionId;
+    if (!sid || areaName !== 'session') return;
+    const ids = changes[`selection:${sid}`]?.newValue as number[] | undefined;
+    if (!Array.isArray(ids)) return;
+    const next = new Set(ids);
+    const same = next.size === panelState.selected.size && [...next].every((id) => panelState.selected.has(id));
+    if (!same) {
+      panelState.selected = next;
+      renderPagesPage();
+      updateSelSummary();
+    }
+  });
+  bindView({ persistSelection: () => void persistSelection(), submitRange: () => void submitRange() });
   void refreshState();
+}
+
+function openManager(): void {
+  const url = chrome.runtime.getURL('manager/manager.html');
+  try {
+    void chrome.tabs.create({ url });
+  } catch {
+    window.open(url, '_blank');
+  }
 }
 
 async function refreshState(): Promise<void> {
   const st: StateInfo = await send({ type: 'GET_STATE' });
   panelState.recording = st.recording;
-  panelState.sessionId = st.sessionId;
+  panelState.activeId = st.sessionId;
+  if (!panelState.sessionId) panelState.sessionId = st.sessionId;
   $('dot').classList.toggle('on', st.recording);
   $('recText').textContent = st.recording ? '录制中' : '未录制';
   ($('btnToggle') as HTMLButtonElement).textContent = st.recording ? '■ 停止录制' : '● 开始录制';
-  panelState.cache = st.sessionId ? await send({ type: 'GET_SESSION', id: st.sessionId }) : null;
-  panelState.pages = panelState.cache
-    ? buildPages(panelState.cache.actions, panelState.cache.requests, panelState.cache.pinia)
-    : [];
+
+  panelState.sessions = (await send({ type: 'LIST_SESSIONS' })) as SessionSummary[];
+  renderSessions($('sessionList'), panelState.sessions, {
+    currentId: panelState.sessionId,
+    activeId: panelState.activeId,
+    onSelect: (id) => {
+      panelState.sessionId = id;
+      panelState.highlightKey = null;
+      void refreshState();
+    },
+    onDelete: (id) => void deleteSession(id),
+  });
+
+  panelState.cache = panelState.sessionId ? await send({ type: 'GET_SESSION', id: panelState.sessionId }) : null;
+  await loadSelection();
+  rebuildPages();
   renderTimeline();
   setPage(0);
+  updateSelSummary();
+  (window as unknown as Record<string, unknown>).__bugrecPanelState = panelState; // 测试钩子
 }
 
-/* ---------- 时间轴缩略图 ---------- */
+async function deleteSession(id: string): Promise<void> {
+  if (!confirm('删除该会话及其所有截图/记录?')) return;
+  await send({ type: 'DELETE_SESSION', id });
+  if (panelState.sessionId === id) panelState.sessionId = null;
+  await refreshState();
+}
 
-function renderTimeline(): void {
-  const box = $('timeline');
-  box.textContent = '';
-  if (!panelState.cache || !panelState.cache.actions.length) {
-    box.innerHTML =
-      '<div class="empty">开始录制后,每步截图将按时间显示在这里;点击可定位大步骤,选范围后可只提交该范围。</div>';
+async function loadSelection(): Promise<void> {
+  const acts = panelState.cache?.actions ?? [];
+  if (!panelState.sessionId) {
+    panelState.selected = new Set(acts.map((a) => a.id!));
     return;
   }
-  const inRangeTs = (ts: number): boolean =>
-    !!panelState.range && ts >= panelState.range.fromTs && ts <= panelState.range.toTs;
-  for (const a of panelState.cache.actions) {
-    if (!a.screenshot) continue;
-    const t = document.createElement('div');
-    t.className = 'thumb' + (inRangeTs(a.ts) ? ' in-range' : '');
-    t.title = `${clockOf(a.ts)} ${describeAction(a)}`;
-    const img = document.createElement('img');
-    img.src = a.screenshot;
-    const cap = document.createElement('span');
-    cap.className = 'cap';
-    cap.textContent = clockOf(a.ts);
-    t.append(img, cap);
-    t.addEventListener('click', () => onThumbClick(a));
-    box.appendChild(t);
-  }
+  const res = await send({ type: 'GET_SELECTION', sessionId: panelState.sessionId });
+  panelState.selected = new Set(res.ids ?? acts.map((a) => a.id!));
 }
 
-function onThumbClick(a: { ts: number; screenshot?: string }): void {
-  if (panelState.rangeMode) {
-    if (panelState.rangeFromTs == null) {
-      // 第一下:选起点
-      panelState.rangeFromTs = a.ts;
-      panelState.range = null;
-      $('rangeInfo').textContent = `起点 ${clockOf(a.ts)} 已选,再点击终点截图`;
-      $('btnClearRange').hidden = false;
-      renderTimeline();
-      return;
+async function persistSelection(): Promise<void> {
+  if (!panelState.sessionId) return;
+  const ids = [...panelState.selected];
+  const write = async (): Promise<void> => {
+    await send({ type: 'SET_SELECTION', sessionId: panelState.sessionId!, ids });
+  };
+  // 写后读回校验;SW 冷启动等瞬窗失败时重试一次
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await write();
+      const back = await send({ type: 'GET_SELECTION', sessionId: panelState.sessionId });
+      if (back.ids && back.ids.length === ids.length) return;
+    } catch {
+      /* 重试 */
     }
-    // 第二下:起止两点成区间
-    const from = Math.min(panelState.rangeFromTs, a.ts);
-    const to = Math.max(panelState.rangeFromTs, a.ts);
-    panelState.range = { sessionId: panelState.sessionId || '', fromTs: from, toTs: to };
-    const n = panelState.cache!.actions.filter((x) => x.ts >= from && x.ts <= to).length;
-    $('rangeInfo').textContent = `选区 ${clockOf(from)} ~ ${clockOf(to)}(约 ${n} 步),可按此范围去提交`;
-    $('btnSubmitRange').hidden = false;
-    renderTimeline();
-    return;
+    await new Promise((r) => setTimeout(r, 350));
   }
-  locate(a.ts);
-}
-
-/* ---------- 大步骤分页列表 ---------- */
-
-function setPage(idx: number): void {
-  const total = Math.max(1, Math.ceil(panelState.pages.length / PAGE_SIZE));
-  panelState.pageIdx = Math.min(Math.max(0, idx), total - 1);
-  const slice = panelState.pages.slice(panelState.pageIdx * PAGE_SIZE, (panelState.pageIdx + 1) * PAGE_SIZE);
-  const rows = renderPages($('pages'), slice, { highlightKey: panelState.highlightKey }) as PageRow[];
-  $('pgInfo').textContent = `${panelState.pageIdx + 1} / ${total}`;
-  ($('pgPrev') as HTMLButtonElement).disabled = panelState.pageIdx === 0;
-  ($('pgNext') as HTMLButtonElement).disabled = panelState.pageIdx >= total - 1;
-  return void rows;
-}
-
-function locate(ts: number): void {
-  const p = panelState.pages.find((x) => ts >= x.startTime && ts <= x.endTime);
-  if (!p) return;
-  panelState.highlightKey = p.key;
-  setPage(Math.floor(panelState.pages.indexOf(p) / PAGE_SIZE));
-  const rows = renderPages($('pages'), panelState.pages.slice(panelState.pageIdx * PAGE_SIZE, (panelState.pageIdx + 1) * PAGE_SIZE), {
-    highlightKey: panelState.highlightKey,
-  }) as PageRow[];
-  const row = rows.find((el) => el.__pageKey === p.key);
-  if (row && row.__locate) row.__locate();
-}
-
-/* ---------- 选区提交 ---------- */
-
-function clearRange(): void {
-  panelState.range = null;
-  panelState.rangeFromTs = null;
-  $('rangeInfo').textContent = panelState.rangeMode
-    ? '依次点击两张截图:第一张为起点,第二张为终点'
-    : '点击下方截图可定位大步骤';
-  $('btnClearRange').hidden = true;
-  $('btnSubmitRange').hidden = true;
-  renderTimeline();
 }
 
 async function submitRange(): Promise<void> {
@@ -180,7 +147,6 @@ async function submitRange(): Promise<void> {
     fromTs: panelState.range.fromTs,
     toTs: panelState.range.toTs,
   };
-  // session 区不可用时兜底到 local(两者提交页都能读到)
   const areas = [chrome.storage.session, chrome.storage.local].filter(Boolean);
   try {
     let written = false;
@@ -197,16 +163,15 @@ async function submitRange(): Promise<void> {
       }
     }
     if (!written) throw new Error('写入后读回为空');
-    $('rangeInfo').textContent = `选区已保存(${clockOf(payload.fromTs)} ~ ${clockOf(payload.toTs)}),已打开提交页`;
-    const url = chrome.runtime.getURL('manager/manager.html');
-    try {
-      void chrome.tabs.create({ url });
-    } catch {
-      window.open(url, '_blank');
-    }
+    $('rangeInfo').textContent = `选区已保存,已打开提交页`;
+    openManager();
   } catch (e) {
     $('rangeInfo').textContent = '设置选区失败: ' + ((e as { message?: string }).message ?? e);
   }
 }
+
+// 供缩略图点击入口(视图中转)
+void onThumbClick;
+void locate;
 
 init();

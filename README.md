@@ -19,7 +19,7 @@
 - **截图限量**:提交时"最多附加截图 N 张"(超出取最近),避免 issue 附件爆炸
 - **点击标记**:点击类操作记录视口坐标;截图缩略图/大图/上传件上叠加半透明点击标记(上传件用 OffscreenCanvas 烙入 PNG 透明通道)
 - **CSV 导出**:操作/API/Pinia 按时间交错导出 CSV(Excel 可开),截图列含 base64
-- **DevTools 面板**(类似 Vue Devtools):时间轴缩略图条(点击定位大步骤)、大步骤分页列表、选范围一键去提交
+- **DevTools 面板**(类似 Vue Devtools):**会话列表**(切换查看 / ✕ 删除历史会话)、时间轴缩略图条(点击定位大步骤)、大步骤分页列表、**大步骤 checkbox 勾选**(整页步骤+截图纳入提交,与提交页经 storage 实时双向同步)、选范围一键去提交
 - **一键提交 Redmine**:`POST /uploads.json` → `POST /issues.json`;项目支持列表选择或**手动填项目标识/ID**(列表为空时仍可提交)
 
 ## 安装
@@ -75,7 +75,7 @@ npm run smoke      # 端到端冒烟(40 项断言,需先 build 并启动 demo �
    - **review 描述**(输入值原样记录,可编辑;Markdown)
    - 选择项目(或手动填项目标识)→ **「提交到 Redmine」**,截图按 `step-NN.jpg/png` 附件上传(限量可调)
 
-DevTools 面板的时间轴:每步截图按时间排列,点击缩略图定位到对应大步骤;勾选"选范围"后依次点击两张截图成区间 → 「按此范围去提交」自动打开提交页并裁剪。大步骤多时列表自动分页(每页 5 个)。
+DevTools 面板(F12 → 「Bug Recorder」):顶部为**会话列表**(点击切换查看,✕ 删除;录制中的会话带 LIVE 标记);时间轴按时间排列每步截图,点击定位大步骤;大步骤行首有 **checkbox**,勾选即把该页全部步骤(含截图)纳入提交,与提交页勾选状态实时双向同步(行内显示"已选 x/y");勾选"选范围"后依次点击两张截图成区间 → 「按此范围去提交」自动打开提交页并裁剪。大步骤多时列表自动分页(每页 5 个)。
 
 ## 生成的 issue 描述格式
 
@@ -115,11 +115,13 @@ background/              state(状态/设置)/ net-capture(webRequest)/ net-cdp(
 content/                 dom-meta(选择器/标签)+ recorder(事件录制,入口)/
                          probe-serialize(安全序列化)+ vue-probe(组件/props/Pinia,入口)
 popup/                   弹窗
-manager/                 管理页模块:store / dom / api / settings-ui / sessions-ui /
+manager/                 管理页模块:store / dom / api / settings-ui / sessions-ui / selection /
                          entry-ui / page-ui / steps-ui / report-ui / range / export-csv
-devtools/                DevTools 面板(devtools.ts 注册 + panel/panel-pages 时间轴/分页/选区)
+devtools/                DevTools 面板:panel(编排)/ panel-state / panel-sessions(会话列表)/
+                         panel-pages(大步骤分页+勾选)/ panel-view(时间轴/定位/选范围)
+background/selection.ts  勾选集合持久化(storage.session,面板 ↔ 提交页共享)
 demo/                    本地演示:普通页 + Vue3+Pinia 页 + 假 Redmine
-tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,40 项断言,加载 dist/)
+tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,50 项断言,加载 dist/)
 tools/gen_icons.py       图标生成
 dist/                    构建产物(浏览器实际加载的目录,gitignore)
 ```
@@ -139,8 +141,8 @@ sleep 4
 node tools/cdp_smoke.mjs 9223 bkeogdmbgodhopooimgmbacldmdmpeap "$PWD"
 ```
 
-最近一次全量结果:**40/40 PASS**(TS 构建产物;含 Vue 组件名、props diff、Pinia 事件、步骤勾选/删除、
-排序/搜索/折叠、截图限量、PNG 点击标记、CSV 下载、DevTools 面板定位/选区、提交 Redmine 全链路)。
+最近一次全量结果:**50/50 PASS**(TS 构建产物;含 Vue 组件名、props diff、Pinia 事件、步骤勾选/删除、
+排序/搜索/折叠、截图限量、PNG 点击标记、CSV 下载、DevTools 面板会话列表/勾选同步/删除会话/选区、提交 Redmine 全链路)。
 
 ## 隐私与安全
 

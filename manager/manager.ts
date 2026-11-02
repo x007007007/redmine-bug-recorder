@@ -7,6 +7,7 @@ import { initSettings, loadSettings, loadTrackersAndPriorities } from './setting
 import { initReport, regenerateDescription } from './report-ui';
 import { initToolbar, renderAll, setNotifier } from './steps-ui';
 import { refreshSessions, selectSession } from './sessions-ui';
+import { persistSelection } from './selection';
 
 async function refreshRecState(): Promise<{ recording: boolean; sessionId: string | null }> {
   const st = await send({ type: 'GET_STATE' });
@@ -36,12 +37,17 @@ $('lightbox').addEventListener('click', () => ($('lightbox').hidden = true));
 chrome.runtime.onMessage.addListener((msg: { type?: string; sessionId?: string | null }) => {
   if (msg && msg.type === 'SESSION_UPDATED') {
     void refreshSessions();
-    // 正在查看的会话有新内容:静默刷新,新步骤默认勾选,不打扰正在填写的表单
+    // 正在查看的会话有新内容:静默刷新;已有勾选存档时尊重用户勾选(不整体重置)
     if (msg.sessionId === store.currentId && store.currentId) {
       send({ type: 'GET_SESSION', id: store.currentId })
-        .then((data) => {
+        .then(async (data) => {
           store.cache = data;
-          for (const a of data.actions) store.selected.add(a.id!);
+          const persisted = await send({ type: 'GET_SELECTION', sessionId: store.currentId! }).catch(() => null);
+          if (persisted && persisted.ids) {
+            store.selected = new Set(persisted.ids); // 尊重已保存的勾选(新步骤保持未勾选)
+          } else {
+            for (const a of data.actions) store.selected.add(a.id!); // 无存档:默认全选
+          }
           renderAll();
           if (!store.descDirty) regenerateDescription();
         })

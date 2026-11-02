@@ -12,9 +12,13 @@
     <button id="btnOpenMgr" title="打开提交/管理页">🚀 提交</button>
   </header>
 
+  <div class="sessions-head"><b>会话</b><span class="m" id="sessHint">(点击切换 · ✕ 删除)</span></div>
+  <div id="sessionList"></div>
+
   <div class="range-bar">
     <label class="chk"><input id="rangeMode" type="checkbox" /> 选范围</label>
     <span id="rangeInfo">点击下方截图可定位大步骤</span>
+    <span class="m" id="selSummary"></span>
     <button id="btnClearRange" class="ghost" hidden>清除选区</button>
     <button id="btnSubmitRange" class="primary" hidden>按此范围去提交 →</button>
   </div>

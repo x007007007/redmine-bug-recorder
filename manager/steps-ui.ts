@@ -13,6 +13,7 @@ import {
 import { planShotUploads } from '../shared/shots';
 import { buildPageGroup } from './page-ui';
 import { regenerateDescription } from './report-ui';
+import { persistSelection, adoptSelection, selectionKey } from './selection';
 import type { RecordedAction, PageGroup, PiniaEvent, RequestEntry } from '../shared/types';
 
 let notifier: (() => void) | null = null; // 数据变化后刷新会话列表等
@@ -88,6 +89,7 @@ export function renderAll(): void {
 function onSelectionChanged(): void {
   syncSelAll();
   updateSelInfo();
+  void persistSelection();
   if (!store.descDirty) regenerateDescription();
 }
 
@@ -109,6 +111,7 @@ async function deleteAction(a: RecordedAction): Promise<void> {
     await send({ type: 'DELETE_ITEMS', sessionId: store.currentId, actionIds: [a.id!] });
     if (store.cache) store.cache.actions = store.cache.actions.filter((x) => x.id !== a.id);
     store.selected.delete(a.id!);
+    await persistSelection();
     renderAll();
     onSelectionChanged();
     if (notifier) notifier();
@@ -136,6 +139,7 @@ async function deletePage(p: PageGroup): Promise<void> {
       store.cache.pinia = store.cache.pinia.filter((x) => !pinEntries.some((e) => e.data.id === x.id));
     }
     for (const a of p.actions) store.selected.delete(a.id!);
+    await persistSelection();
     renderAll();
     onSelectionChanged();
     if (notifier) notifier();
@@ -168,5 +172,17 @@ export function initToolbar(): void {
     if (allCollapsed) store.collapsed.clear();
     else for (const p of pages) store.collapsed.add(p.key);
     renderAll();
+  });
+  // DevTools 面板的勾选变化 → 本页实时采纳(storage 双向同步)
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (!store.currentId) return;
+    const key = selectionKey(store.currentId);
+    if (!(key in changes) || areaName !== 'session') return;
+    if (adoptSelection(changes[key]!.newValue)) {
+      syncSelAll();
+      updateSelInfo();
+      renderAll();
+      if (!store.descDirty) regenerateDescription();
+    }
   });
 }

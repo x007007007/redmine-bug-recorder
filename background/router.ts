@@ -4,6 +4,7 @@
 import { getSettings, state, mem } from './state';
 import { startRecording, stopRecording, onRecAction, onRecPinia } from './recorder';
 import { listSessions, getSession, deleteSession, deleteItems } from './sessions';
+import { getSelection, setSelection } from './selection';
 import { redmineEndpoints, submitRedmine } from './redmine-submit';
 import type { RecorderSettings } from '../shared/types';
 
@@ -22,6 +23,8 @@ const HANDLERS: Record<string, Handler> = {
   }),
   LIST_SESSIONS: () => listSessions(),
   GET_SESSION: (msg) => getSession(String(msg.id)),
+  GET_SELECTION: (msg) => getSelection(String(msg.sessionId)),
+  SET_SELECTION: (msg) => setSelection(String(msg.sessionId), (msg.ids as number[]) || []),
   DELETE_SESSION: (msg) => deleteSession(String(msg.id)),
   DELETE_ITEMS: (msg) =>
     deleteItems(

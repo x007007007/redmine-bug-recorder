@@ -17,11 +17,14 @@ export function clockOf(ts: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-export function renderPages(
-  container: HTMLElement,
-  rows: PageGroup[],
-  opts: { highlightKey: string | null }
-): PageRow[] {
+export interface PageRenderOpts {
+  highlightKey: string | null;
+  /** 勾选集合(缺失视为全选之后的具体 id 集) */
+  isSelected: (id: number) => boolean;
+  onTogglePage: (p: PageGroup, checked: boolean) => void;
+}
+
+export function renderPages(container: HTMLElement, rows: PageGroup[], opts: PageRenderOpts): PageRow[] {
   container.textContent = '';
   if (!rows.length) {
     container.innerHTML = '<div class="empty" style="color:#5f6368;padding:12px;">暂无大步骤</div>';
@@ -29,26 +32,43 @@ export function renderPages(
   }
   const out: PageRow[] = [];
   for (const p of rows) {
-    const row = buildRow(p, opts.highlightKey);
+    const row = buildRow(p, opts);
     container.appendChild(row);
     out.push(row);
   }
   return out;
 }
 
-function buildRow(p: PageGroup, highlightKey: string | null): PageRow {
+function buildRow(p: PageGroup, opts: PageRenderOpts): PageRow {
   const row = document.createElement('div') as PageRow;
-  row.className = 'page-row' + (p.key === highlightKey ? ' hl' : '');
+  row.className = 'page-row' + (p.key === opts.highlightKey ? ' hl' : '');
   row.__pageKey = p.key;
 
   const head = document.createElement('div');
   head.className = 'head';
+
+  // 大步骤勾选:勾上=该页全部步骤(含截图)纳入提交
+  const real = p.actions.filter((a) => a.kind !== 'navigate');
+  const selCount = real.filter((a) => opts.isSelected(a.id!)).length;
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'page-cb';
+  cb.checked = real.length > 0 && selCount === real.length;
+  cb.indeterminate = selCount > 0 && selCount < real.length;
+  cb.title = `勾选该页全部步骤(共 ${real.length} 步,当前已选 ${selCount})`;
+  cb.addEventListener('click', (e) => e.stopPropagation());
+  cb.addEventListener('change', () => opts.onTogglePage(p, cb.checked));
+  head.appendChild(cb);
+
   const clock = `${clockOf(p.startTime)}${p.endTime > p.startTime ? ' ~ ' + clockOf(p.endTime) : ''}`;
   const apiCount = p.entries.filter((e) => e.type === 'request').length;
-  head.innerHTML =
+  const title = document.createElement('span');
+  title.className = 'titles';
+  title.innerHTML =
     `<span class="u">📄 大步骤 ${p.orderIndex} · ${esc(shortenUrl(p.url, 70))}</span>` +
-    `<span class="m">${clock} · ${p.actions.length} 步 / ${apiCount} API · 点击展开明细</span>`;
-  head.addEventListener('click', () => row.classList.toggle('open'));
+    `<span class="m">${clock} · ${p.actions.length} 步 / ${apiCount} API · 已选 ${selCount}/${real.length} · 点击展开明细</span>`;
+  title.addEventListener('click', () => row.classList.toggle('open'));
+  head.appendChild(title);
   row.appendChild(head);
 
   const entries = document.createElement('div');

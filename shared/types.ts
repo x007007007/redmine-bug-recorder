@@ -175,6 +175,8 @@ export interface ResultMap {
   GET_STATE: StateInfo;
   LIST_SESSIONS: SessionSummary[];
   GET_SESSION: SessionDetail;
+  GET_SELECTION: { sessionId: string; ids: number[] | null };
+  SET_SELECTION: { ok: true };
   DELETE_SESSION: { ok: true };
   DELETE_ITEMS: { ok: true; removed: number };
   SETTINGS_GET: RecorderSettings;

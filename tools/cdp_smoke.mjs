@@ -451,6 +451,77 @@ await evalJs(panel.sessionId, `document.querySelectorAll('#timeline .thumb')[1].
 await waitFor(panel.sessionId, `document.querySelector('.page-row.hl') !== null`, '点击缩略图定位大步骤');
 ok('DevTools 面板:缩略图点击定位大步骤', true, '');
 
+/* 9.1 面板会话列表 + 大步骤勾选(与提交页同步) */
+const sessInfo = await evalJs(
+  panel.sessionId,
+  `(() => {
+     const items = [...document.querySelectorAll('#sessionList .session-item')];
+     return { n: items.length, del: items.filter(i => i.querySelector('.si-del')).length };
+   })()`
+);
+ok('DevTools 面板:会话列表渲染(含删除按钮)', sessInfo.n >= 1 && sessInfo.del >= 1, `会话 ${sessInfo.n} 个`);
+
+const beforeSel = await evalJs(panel.sessionId, `window.__bugrecPanelState.selected.size`);
+const cbOk = await evalJs(
+  panel.sessionId,
+  `(() => {
+     const rows = [...document.querySelectorAll('.page-row')];
+     const row = rows.find(r => { const cb = r.querySelector('.page-cb'); return cb && cb.checked && !cb.indeterminate; });
+     if (!row) return null;
+     row.querySelector('.page-cb').click(); // 整页取消勾选(步骤+截图集合缩减)
+     return row.querySelector('.u').textContent;
+   })()`
+);
+await sleep(700);
+const afterSel = await evalJs(panel.sessionId, `window.__bugrecPanelState.selected.size`);
+ok(
+  '面板大步骤 checkbox 取消勾选(步骤+截图集合缩减)',
+  typeof cbOk === 'string' && afterSel < beforeSel,
+  `${beforeSel}→${afterSel} (${cbOk})`
+);
+let selPersisted = -1;
+let rawLen = -1;
+for (let i = 0; i < 8 && selPersisted !== afterSel; i++) {
+  await sleep(350);
+  [selPersisted, rawLen] = await evalJs(
+    panel.sessionId,
+    `(async () => {
+       const sid = window.__bugrecPanelState.sessionId;
+       const msg = await chrome.runtime.sendMessage({type:'GET_SELECTION', sessionId: sid}).then(r => (r.ids || []).length).catch(() => -1);
+       const raw = await chrome.storage.session.get('selection:' + sid).then(v => ((v['selection:' + sid] || []).length));
+       return [msg, raw];
+     })()`
+  );
+}
+ok(
+  '勾选集合持久化到 SW(GET_SELECTION 可读)',
+  selPersisted === afterSel && rawLen === afterSel,
+  `msg=${selPersisted} raw=${rawLen}`
+);
+let mgrSynced = '';
+for (let i = 0; i < 8; i++) {
+  await sleep(350);
+  mgrSynced = await evalJs(manager.sessionId, `document.getElementById('selInfo').textContent`);
+  if (new RegExp(`已选 ${afterSel} / `).test(mgrSynced)) break;
+}
+ok('提交页实时同步面板勾选(storage.onChanged)', new RegExp(`已选 ${afterSel} / `).test(mgrSynced), mgrSynced.trim());
+// 按标题找回刚才取消的行,重新勾上
+await evalJs(
+  panel.sessionId,
+  `(() => {
+     const rows = [...document.querySelectorAll('.page-row')];
+     const row = rows.find(r => r.querySelector('.u') && r.querySelector('.u').textContent === ${JSON.stringify(typeof cbOk === 'string' ? cbOk : '')});
+     if (row) {
+       const cb = row.querySelector('.page-cb');
+       if (cb && !cb.checked) cb.click();
+     }
+     return true;
+   })()`
+);
+await sleep(500);
+const restored = await evalJs(panel.sessionId, `window.__bugrecPanelState.selected.size`);
+ok('重新勾选恢复(回到 beforeSel)', restored === beforeSel, `${restored}/${beforeSel}`);
+
 const picked = await evalJs(
   panel.sessionId,
   `(() => {
@@ -496,6 +567,22 @@ ok(
   !scopedDesc.includes('在「用户名」中输入') && scopedDesc.includes('AddOrderForm'),
   ''
 );
+
+/* 11. 面板删除历史会话(再造一个空会话后删除) */
+await evalJs(panel.sessionId, `window.confirm = () => true; true`);
+await evalJs(
+  panel.sessionId,
+  `chrome.runtime.sendMessage({type:'STOP_RECORDING'})
+     .then(() => chrome.runtime.sendMessage({type:'START_RECORDING'}))
+     .then(() => chrome.runtime.sendMessage({type:'STOP_RECORDING'})).then(() => true)`
+);
+await sleep(1200);
+const twoCount = await evalJs(panel.sessionId, `chrome.runtime.sendMessage({type:'LIST_SESSIONS'}).then(r => r.length)`);
+ok('面板会话列表出现新建的空会话(共2个)', twoCount === 2, `当前 ${twoCount} 个`);
+await evalJs(panel.sessionId, `(() => { const it = document.querySelector('#sessionList .session-item[data-count="0"] .si-del'); if (it) it.click(); return !!it; })()`);
+await sleep(1000);
+const oneCount = await evalJs(panel.sessionId, `chrome.runtime.sendMessage({type:'LIST_SESSIONS'}).then(r => r.length)`);
+ok('面板删除空会话成功(剩1个)', oneCount === 1, `剩余 ${oneCount} 个`);
 
 console.log('SMOKE_DONE');
 console.log(JSON.stringify(results, null, 2));

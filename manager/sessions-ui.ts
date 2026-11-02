@@ -7,6 +7,7 @@ import { fmtTime } from '../shared/describe';
 import { renderAll } from './steps-ui';
 import { prefillForm } from './report-ui';
 import { readPendingRange, applyScope, renderScopeBanner } from './range';
+import { loadSelection } from './selection';
 import type { RecorderSession, SessionSummary } from '../shared/types';
 
 export async function refreshSessions(): Promise<void> {
@@ -89,7 +90,8 @@ export async function selectSession(id: string): Promise<void> {
     showError(e);
     return;
   }
-  store.selected = new Set(store.cache!.actions.map((a) => a.id!)); // 默认全选,review 时可取消
+  // 默认全选(缺历史勾选时),review 时可取消;与 DevTools 面板共享同一份勾选
+  store.selected = await loadSelection(id, store.cache!.actions);
   setDetailVisible(true);
   renderAll();
   renderScopeBanner();
