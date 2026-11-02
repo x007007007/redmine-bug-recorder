@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Vue + Pinia 演示 · 订单</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font: 15px/1.6 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f6f7f9; color: #202124; }
+    .wrap { max-width: 560px; margin: 40px auto; background: #fff; border: 1px solid #e0e3e7; border-radius: 12px; padding: 26px; }
+    h1 { font-size: 18px; } h2 { font-size: 15px; margin-top: 20px; }
+    p.tip { color: #5f6368; font-size: 12px; margin: 4px 0 16px; }
+    label { display: block; font-size: 12px; color: #5f6368; margin: 10px 0 4px; }
+    input, select { width: 100%; padding: 9px 10px; border: 1px solid #dadce0; border-radius: 8px; font: inherit; }
+    button { margin-top: 12px; padding: 9px 16px; border: none; border-radius: 8px; background: #1a73e8; color: #fff; font-weight: 600; cursor: pointer; }
+    .order { display: flex; justify-content: space-between; align-items: center; padding: 10px 4px; border-bottom: 1px solid #f1f3f4; }
+    .order button { margin: 0; padding: 4px 12px; font-size: 12px; background: #fce8e6; color: #d93025; }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app"></div>
+
+  <!-- 离线本地化的 Vue 3 dev 构建 + VueDemi + Pinia(dev) -->
+  <script src="/vendor/vue.global.js"></script>
+  <script src="/vendor/vue-demi.iife.js"></script>
+  <script src="/vendor/pinia.iife.js"></script>
+  <script>
+    const { createApp, defineComponent, ref } = Vue;
+    const { createPinia, defineStore } = Pinia;
+
+    const useOrderStore = defineStore('orders', {
+      state: () => ({ orders: [], seq: 1, total: 0 }),
+      actions: {
+        addOrder(product, qty) {
+          const id = this.seq++;
+          this.orders.push({ id, product, qty });
+          this.total += qty;
+        },
+        removeOrder(id) {
+          const hit = this.orders.find((o) => o.id === id);
+          if (hit) this.total -= hit.qty;
+          this.orders = this.orders.filter((o) => o.id !== id);
+        },
+      },
+    });
+
+    const OrderItem = defineComponent({
+      name: 'OrderItem',
+      props: { order: { type: Object, required: true } },
+      emits: ['remove'],
+      template: `
+        <div class="order">
+          <span>#{{ order.id }} · {{ order.product }} × {{ order.qty }}</span>
+          <button class="btn-remove" @click="$emit('remove', order.id)">删除</button>
+        </div>`,
+    });
+
+    const AddOrderForm = defineComponent({
+      name: 'AddOrderForm',
+      props: { defaultQty: { type: Number, default: 1 } },
+      setup(props) {
+        const product = ref('先锋园区年卡');
+        const qty = ref(props.defaultQty);
+        const store = useOrderStore();
+        function submit() {
+          store.addOrder(product.value, qty.value);
+        }
+        return { product, qty, submit };
+      },
+      template: `
+        <div>
+          <label for="product">产品</label>
+          <select id="product" v-model="product">
+            <option>先锋园区年卡</option>
+            <option>孵化工位</option>
+            <option>会议室包月</option>
+          </select>
+          <label for="qty">数量</label>
+          <input id="qty" type="number" v-model.number="qty" />
+          <button id="btnAddOrder" @click="submit">添加订单</button>
+        </div>`,
+    });
+
+    const App = defineComponent({
+      name: 'OrderApp',
+      components: { AddOrderForm, OrderItem },
+      setup() {
+        const store = useOrderStore();
+        return { store };
+      },
+      template: `
+        <h1>🛒 Vue + Pinia 订单演示</h1>
+        <p class="tip">验证点:组件名捕获(AddOrderForm / OrderItem)、props 快照与 diff、Pinia $subscribe / $onAction</p>
+        <add-order-form :default-qty="2"></add-order-form>
+        <h2>订单列表(合计 {{ store.total }} 件)</h2>
+        <order-item v-for="o in store.orders" :key="o.id" :order="o" @remove="store.removeOrder"></order-item>
+        <p v-if="!store.orders.length" class="tip">暂无订单</p>`,
+    });
+
+    createApp(App).use(createPinia()).mount('#app');
+  </script>
+</body>
+</html>

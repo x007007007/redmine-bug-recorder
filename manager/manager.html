@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Bug Recorder for Redmine</title>
+  <link rel="stylesheet" href="manager.css" />
+</head>
+<body>
+  <header>
+    <h1>🐞 Bug Recorder <small>for Redmine</small></h1>
+    <span class="chip" id="recChip"><span class="dot" id="dot"></span><span id="recText">未录制</span></span>
+    <button id="btnToggleRec" class="primary">● 开始录制</button>
+    <span id="err" class="err" hidden></span>
+  </header>
+
+  <details id="settingsBox">
+    <summary>⚙️ 设置(Redmine 连接与捕获选项)</summary>
+    <div class="settings-grid">
+      <label>Redmine 地址
+        <input id="setUrl" placeholder="https://redmine.example.com" />
+      </label>
+      <label>API Key(我的账号 页面可查看)
+        <input id="setKey" type="password" placeholder="在 Redmine「我的账号」底部获取" />
+      </label>
+      <label class="chk">
+        <input id="setBodies" type="checkbox" />
+        捕获 API 请求/响应体与 Console(仅 Chrome;浏览器顶部会出现"正在调试"横幅,属正常现象)
+      </label>
+      <div class="row">
+        <button id="btnSaveSettings">保存设置</button>
+        <button id="btnTest">测试连接</button>
+        <span id="testResult"></span>
+      </div>
+    </div>
+  </details>
+
+  <main>
+    <aside>
+      <div class="aside-head">
+        <h2>录制会话</h2>
+        <button id="btnRefresh" class="ghost" title="刷新列表">⟳</button>
+      </div>
+      <div id="sessions"></div>
+    </aside>
+
+    <section id="detail">
+      <div id="noSession" class="empty">选择左侧会话,或点击"开始录制"后去业务页面操作。<br /><br />提示:录制中,每次点击/输入都会自动截图;发现 Bug 后回到本页面提交。</div>
+
+      <div id="sessionDetail" hidden>
+        <div class="detail-head">
+          <h2 id="detailTitle">会话</h2>
+          <button id="btnExport" class="ghost">导出 JSON</button>
+        </div>
+        <div class="meta" id="detailMeta"></div>
+
+        <h3>操作步骤(URL 为大步骤,点击/输入为小步骤 · 勾选要提交的步骤)</h3>
+        <div class="row" style="margin-bottom:8px;">
+          <label class="chk"><input id="selAll" type="checkbox" checked /> 全选</label>
+          <span class="count" id="selInfo"></span>
+        </div>
+        <div id="steps"></div>
+
+        <h3>API 交互记录 <span class="count" id="reqCount"></span></h3>
+        <div id="requests"></div>
+
+        <h3>Pinia 状态流 <span class="count" id="piniaCount"></span></h3>
+        <div id="piniaEvents"></div>
+
+        <h3>提交 Bug 到 Redmine</h3>
+        <form id="bugForm">
+          <label>主题
+            <input id="bugSubject" required placeholder="一句话描述 Bug" />
+          </label>
+          <div class="row wrap">
+            <label>项目
+              <span class="inline"><select id="bugProject"></select><button type="button" id="btnLoadProjects" class="ghost">载入</button></span>
+            </label>
+            <label>跟踪
+              <select id="bugTracker"><option value="">(默认)</option></select>
+            </label>
+            <label>优先级
+              <select id="bugPriority"><option value="">(默认)</option></select>
+            </label>
+          </div>
+          <label>描述(请 review:输入值原样记录,提交前可编辑;Markdown 格式)
+            <textarea id="bugDescription" rows="14" spellcheck="false"></textarea>
+          </label>
+          <div class="row wrap">
+            <label class="chk"><input id="bugAttach" type="checkbox" checked /> 附加每步截图</label>
+            <button type="button" id="btnRegen">重新生成描述</button>
+            <button type="button" id="btnCopyDesc">复制描述</button>
+            <button type="submit" id="btnSubmit" class="primary">🚀 提交到 Redmine</button>
+          </div>
+          <div id="submitResult"></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <div id="lightbox" hidden><img id="lightboxImg" alt="截图预览" /></div>
+  <script src="manager.js" type="module"></script>
+</body>
+</html>

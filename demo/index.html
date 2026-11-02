@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>演示应用 · 图书管理</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font: 15px/1.6 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f6f7f9; color: #202124; }
+    .wrap { max-width: 520px; margin: 40px auto; background: #fff; border: 1px solid #e0e3e7; border-radius: 12px; padding: 26px; }
+    h1 { font-size: 18px; margin-bottom: 4px; }
+    p.tip { color: #5f6368; font-size: 12px; margin-bottom: 18px; }
+    .card { border-top: 1px dashed #e0e3e7; padding-top: 16px; margin-top: 16px; }
+    label { display: block; font-size: 12px; color: #5f6368; margin: 10px 0 4px; }
+    input, select { width: 100%; padding: 9px 10px; border: 1px solid #dadce0; border-radius: 8px; font: inherit; }
+    button { margin-top: 12px; padding: 9px 16px; border: none; border-radius: 8px; background: #1a73e8; color: #fff; font-weight: 600; cursor: pointer; }
+    button.danger { background: #d93025; }
+    button.ghost { background: #e8eaed; color: #202124; font-weight: 400; }
+    ul { list-style: none; margin-top: 10px; }
+    li { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; border-bottom: 1px solid #f1f3f4; }
+    li button { margin: 0; padding: 4px 10px; font-size: 12px; background: #fce8e6; color: #d93025; }
+    #msg { margin-top: 12px; font-size: 13px; min-height: 20px; }
+    #msg.err { color: #d93025; }
+    #msg.ok { color: #188038; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>📚 图书管理(演示应用)</h1>
+    <p class="tip">用于测试 Bug Recorder:登录 → 增删图书 → 点"触发服务器错误"制造一个 Bug。</p>
+
+    <div id="loginBox" class="card">
+      <h2 style="font-size:15px;">登录</h2>
+      <label for="username">用户名</label>
+      <input id="username" name="username" placeholder="demo" />
+      <label for="password">密码</label>
+      <input id="password" name="password" type="password" placeholder="demo123" />
+      <button id="btnLogin">登 录</button>
+    </div>
+
+    <div id="appBox" class="hidden card">
+      <h2 style="font-size:15px;">添加图书</h2>
+      <label for="bookTitle">书名</label>
+      <input id="bookTitle" name="bookTitle" placeholder="三体" />
+      <label for="bookCat">分类</label>
+      <select id="bookCat" name="bookCat">
+        <option value="sci-fi">科幻</option>
+        <option value="tech">技术</option>
+        <option value="novel">小说</option>
+      </select>
+      <button id="btnAdd">添加图书</button>
+
+      <h2 style="font-size:15px; margin-top:20px;">书单</h2>
+      <ul id="bookList"></ul>
+
+      <div style="margin-top:20px;">
+        <button id="btnFail" class="danger">触发服务器错误(Bug 演示)</button>
+        <button id="btnLogout" class="ghost">退出登录</button>
+      </div>
+    </div>
+
+    <div id="msg"></div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    function show(text, cls) {
+      $('msg').className = cls || '';
+      $('msg').textContent = text;
+    }
+    async function api(path, opts) {
+      const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      return data;
+    }
+    async function loadBooks() {
+      const data = await api('/api/books');
+      const ul = $('bookList');
+      ul.textContent = '';
+      for (const b of data.books) {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${b.title} <em style="color:#80868b;font-size:12px;">${b.category}</em></span>`;
+        const del = document.createElement('button');
+        del.textContent = '删除';
+        del.dataset.title = b.title;
+        del.addEventListener('click', async () => {
+          await api('/api/books/delete', { method: 'POST', body: JSON.stringify({ title: b.title }) });
+          show(`已删除《${b.title}》`, 'ok');
+          loadBooks();
+        });
+        li.appendChild(del);
+        ul.appendChild(li);
+      }
+    }
+    $('btnLogin').addEventListener('click', async () => {
+      try {
+        await api('/api/login', { method: 'POST', body: JSON.stringify({ username: $('username').value, password: $('password').value }) });
+        $('loginBox').classList.add('hidden');
+        $('appBox').classList.remove('hidden');
+        await loadBooks();
+        show('登录成功', 'ok');
+      } catch (e) {
+        show('登录失败: ' + e.message, 'err');
+      }
+    });
+    $('btnAdd').addEventListener('click', async () => {
+      try {
+        await api('/api/books', { method: 'POST', body: JSON.stringify({ title: $('bookTitle').value, category: $('bookCat').value }) });
+        show(`已添加《${$('bookTitle').value}》`, 'ok');
+        $('bookTitle').value = '';
+        loadBooks();
+      } catch (e) {
+        show('添加失败: ' + e.message, 'err');
+      }
+    });
+    $('btnFail').addEventListener('click', async () => {
+      try {
+        await api('/api/fail', { method: 'POST', body: JSON.stringify({ action: 'trigger-bug' }) });
+      } catch (e) {
+        show('💥 服务器报错(这就是要提交的 Bug): ' + e.message, 'err');
+        console.error('[demo] 服务器内部错误:', e.message);
+      }
+    });
+    $('btnLogout').addEventListener('click', () => {
+      $('appBox').classList.add('hidden');
+      $('loginBox').classList.remove('hidden');
+      show('已退出');
+    });
+  </script>
+</body>
+</html>

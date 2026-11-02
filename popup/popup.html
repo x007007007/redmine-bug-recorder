@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root { --accent: #d93025; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { width: 280px; font: 13px/1.5 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 14px; background: #fff; color: #202124; }
+    h1 { font-size: 14px; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #9aa0a6; display: inline-block; }
+    .dot.on { background: var(--accent); animation: blink 1s infinite; }
+    @keyframes blink { 50% { opacity: 0.35; } }
+    #status { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f6f7f9; border-radius: 8px; margin-bottom: 10px; }
+    #stats { color: #5f6368; font-size: 12px; margin-bottom: 10px; }
+    button { width: 100%; padding: 8px 0; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; }
+    #btnToggle { background: var(--accent); color: #fff; font-weight: 600; }
+    #btnToggle.stop { background: #5f6368; }
+    #btnManager { background: #e8eaed; color: #202124; margin-top: 8px; }
+    .hint { margin-top: 10px; font-size: 11px; color: #80868b; }
+    .err { color: var(--accent); font-size: 12px; margin-top: 8px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>🐞 Bug Recorder</h1>
+  <div id="status"><span class="dot" id="dot"></span><span id="stateText">未录制</span></div>
+  <div id="stats">—</div>
+  <button id="btnToggle">● 开始录制</button>
+  <button id="btnManager">打开管理页(提交 Bug / 设置)</button>
+  <div class="err" id="err" hidden></div>
+  <div class="hint">录制中,页面上的点击 / 输入会按步骤记录,每步自动截图;API 交互一并捕获。</div>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

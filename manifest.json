@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Bug Recorder for Redmine",
+  "version": "0.1.0",
+  "description": "测试助手:记录 UI 操作步骤(每步自动截图)与 API 交互,一键提交 Bug 到 Redmine。",
+
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq5Tq+ssdJICgIsS4SBQ+YTRgJOufAeMHPJCW0cGfnQUvpFfzCoGWZSZW4TvYdSWt4RRFckDfHsWZomXqQNCvAmSU2BGq2pez7xxqsr/KROq0Njo87Y2RFl/YAxO4IxSTBF3u7KNSxkJu2x71mSh9XM3GH7J6Y5Kuo7lirvDMey7QA5DFHyIuTZLtoWx+DtZx4pdZED43xY6qF45VMM0D18ovbkgirqkxYHNY1wxAx0QrKAX0ihk3tFpMNdvJA973xnouNRYWMXW8T9wxi2gXow7hDVEU6ELWf6eqNgKT83CvPoGFYVvjKk86BEUqnmPpMQFPjoWnJ4PagL7fXn1kTwIDAQAB",
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content/vue-probe.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content/recorder.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+
+  "action": {
+    "default_title": "Bug Recorder for Redmine",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "options_ui": {
+    "page": "manager/manager.html",
+    "open_in_tab": true
+  },
+
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "tabs",
+    "activeTab",
+    "webRequest",
+    "debugger"
+  ],
+  "host_permissions": ["<all_urls>"]
+}

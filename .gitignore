@@ -1,0 +1,17 @@
+# 本地测试产物
+demo/.fake-redmine/
+demo/__pycache__/
+tools/__pycache__/
+__pycache__/
+*.pyc
+
+# 系统/编辑器
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# 打包产物
+*.xpi
+*.zip
+web-ext-artifacts/
