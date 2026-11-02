@@ -2,8 +2,17 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <!-- DevTools 入口页:注册面板。面板本体是 panel.html -->
+  <!-- DevTools 入口页:负责注册面板,自身不展示内容。
+       body 中的回退文案仅在该页被直接打开/渲染异常时可见。 -->
   <script src="devtools.js"></script>
+  <style>
+    body { font: 13px/1.6 system-ui, sans-serif; color: #5f6368; padding: 24px; }
+    code { background: #f1f3f4; padding: 1px 6px; border-radius: 4px; }
+  </style>
 </head>
-<body></body>
+<body>
+  <p>这是 Bug Recorder 的 DevTools 入口页(正常情况下不可见)。</p>
+  <p>面板应出现在 DevTools 顶部的「Bug Recorder」标签页中;若未出现,请查看
+    <code>about:debugging</code> → 本扩展 →「检查」控制台中的 <code>[Bug Recorder]</code> 日志。</p>
+</body>
 </html>
