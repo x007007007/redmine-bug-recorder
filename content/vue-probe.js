@@ -1,61 +1,18 @@
-// Vue 探针(主世界运行,manifest 指定 "world": "MAIN"):
-//  - 通过 el.__vueParentComponent 拿组件实例链(名称 + 当时的 props 快照)
-//  - 通过 appContext 定位 Pinia 实例,遍历 _s 对所有 store:
-//      $subscribe 记录状态变更流(哪个 store / 哪些 key)
-//      $onAction  记录调用了哪个 action
-//  - 每次探针时对比各 store $state 快照,返回"发生变化的 store"列表
-// 与隔离世界(recorder.js)的协议:
-//   收到 bugrec:probe(detail:{id}) → 读取 [data-bugrec-eid=id] 元素 → 计算 → 派发 bugrec:vue-info
-//   任何时刻 Pinia 变更 → 派发 bugrec:pinia(detail)
-// 兼容性:Vue3 dev/Vite 下组件链与 props 最完整;生产构建可能拿不到 __vueParentComponent,
-// 自动降级为普通步骤(选择器/输入值/Pinia 变化仍可用,pinia._s 在生产构建同样存在)。
+// Vue 探针(主世界,manifest "world": "MAIN"):
+//  - el.__vueParentComponent → 组件链(名称 + 当时的 props 快照)
+//  - appContext → 定位 Pinia(带 _s Map 的 provide),订阅 $subscribe / $onAction
+//  - 每次探针对比 store 快照,返回发生变化的 store
+// 兼容:Vue3 dev/Vite 下组件链与 props 最完整;生产构建可能拿不到 __vueParentComponent,
+// 自动降级(选择器/输入值/Pinia 变化仍可用)。协议见 recorder.js;序列化在 probe-serialize.js。
+
 (() => {
   if (window.__bugrecVueProbe) return;
   window.__bugrecVueProbe = true;
 
-  const MAX_STR = 200;
+  const { trunc, safeStringify, serializeProps } = __bugrecSer;
   const MAX_STATE = 4096;
   const pinias = new Set(); // 已订阅的 pinia 实例
   const lastSnap = new WeakMap(); // pinia -> Map(storeId -> state json)
-
-  /* ---------- 序列化工具 ---------- */
-
-  function safeStringify(value, depth = 0) {
-    try {
-      if (value === undefined) return 'undefined';
-      if (value === null) return 'null';
-      const t = typeof value;
-      if (t === 'string') return JSON.stringify(value.length > MAX_STR ? value.slice(0, MAX_STR) + '…' : value);
-      if (t === 'number' || t === 'boolean' || t === 'bigint') return String(value);
-      if (t === 'function') return '[fn ' + ((value.name || 'anonymous').slice(0, 40)) + ']';
-      if (t === 'symbol') return value.toString();
-      if (value instanceof Error) return `[${value.name}] ${String(value.message).slice(0, MAX_STR)}`;
-      if (t !== 'object') return String(value);
-      if (depth >= 3) return '[…]';
-      if (Array.isArray(value)) {
-        const arr = value.slice(0, 20).map((v) => safeStringify(v, depth + 1));
-        return '[' + arr.join(',') + (value.length > 20 ? `,…共${value.length}项` : '') + ']';
-      }
-      if (value instanceof Map || value instanceof Set) {
-        const items = [...value].slice(0, 10).map((v) => safeStringify(v, depth + 1));
-        return `${value.constructor.name}(${value.size}){${items.join(',')}}`;
-      }
-      const keys = Object.keys(value).slice(0, 24);
-      const body = keys
-        .map((k) => `${k}: ${safeStringify(value[k], depth + 1)}`)
-        .join(', ');
-      return '{' + body + (Object.keys(value).length > 24 ? ',…' : '') + '}';
-    } catch (e) {
-      return '[序列化失败]';
-    }
-  }
-
-  function trunc(s, n = MAX_STR * 2) {
-    s = String(s == null ? '' : s);
-    return s.length > n ? s.slice(0, n) + '…' : s;
-  }
-
-  /* ---------- Vue 组件实例链 ---------- */
 
   function findInstance(el) {
     let cur = el;
@@ -88,34 +45,10 @@
     return names;
   }
 
-  function serializeProps(inst) {
-    if (!inst || inst.__vue2) {
-      if (inst && inst.__vue2) {
-        try {
-          return trunc(safeStringify(inst.__vue2.$props));
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    }
-    try {
-      const props = inst.props || {};
-      const keys = Object.keys(props);
-      if (!keys.length) return null;
-      const out = {};
-      for (const k of keys.slice(0, 20)) out[k] = safeStringify(props[k]);
-      return trunc(JSON.stringify(out), 1500);
-    } catch {
-      return null;
-    }
-  }
-
-  /* ---------- Pinia 定位与订阅 ---------- */
-
   function findPinia(inst) {
     try {
-      const provides = (inst.appContext && (inst.appContext.provides || (inst.appContext._context && inst.appContext._context.provides))) || {};
+      const provides =
+        (inst.appContext && (inst.appContext.provides || (inst.appContext._context && inst.appContext._context.provides))) || {};
       for (const k of Reflect.ownKeys(provides)) {
         const v = provides[k];
         if (v && v._s instanceof Map) return v;
@@ -126,20 +59,18 @@
     return null;
   }
 
-  function snapMap(pinia) {
-    let m = lastSnap.get(pinia);
-    if (!m) {
-      m = new Map();
-      lastSnap.set(pinia, m);
+  function dispatchPinia(detail) {
+    try {
+      document.dispatchEvent(new CustomEvent('bugrec:pinia', { detail }));
+    } catch {
+      /* ignore */
     }
-    return m;
   }
 
   function subscribePinia(pinia) {
     pinias.add(pinia);
     for (const [id, store] of pinia._s) {
       try {
-        // 状态变更流(含直接赋值 / $patch)
         store.$subscribe(
           (mutation) => {
             const keys =
@@ -150,15 +81,10 @@
                   : mutation.events.key
                     ? [mutation.events.key]
                     : [];
-            dispatchPinia({
-              storeId: String(id),
-              changeType: mutation.type, // direct | patch ... action 的变更也会在这里出现
-              keys: keys.slice(0, 12),
-            });
+            dispatchPinia({ storeId: String(id), changeType: mutation.type, keys: keys.slice(0, 12) });
           },
           { detached: true }
         );
-        // action 调用流
         if (typeof store.$onAction === 'function') {
           store.$onAction(({ name, args }) => {
             dispatchPinia({ storeId: String(id), action: String(name), args: trunc(safeStringify(args), 300) });
@@ -170,15 +96,14 @@
     }
   }
 
-  function dispatchPinia(detail) {
-    try {
-      document.dispatchEvent(new CustomEvent('bugrec:pinia', { detail }));
-    } catch {
-      /* ignore */
+  function snapMap(pinia) {
+    let m = lastSnap.get(pinia);
+    if (!m) {
+      m = new Map();
+      lastSnap.set(pinia, m);
     }
+    return m;
   }
-
-  /* ---------- 状态快照(与上次对比,返回变化的 store) ---------- */
 
   function snapshotChangedStores() {
     const out = [];
@@ -203,8 +128,6 @@
     return out;
   }
 
-  /* ---------- 探针协议 ---------- */
-
   document.addEventListener(
     'bugrec:probe',
     (e) => {
@@ -223,7 +146,7 @@
         }
         info.piniaChanges = snapshotChangedStores();
       } catch (err) {
-        info.error = String(err && err.message || err);
+        info.error = String((err && err.message) || err);
       }
       document.dispatchEvent(new CustomEvent('bugrec:vue-info', { detail: info }));
     },

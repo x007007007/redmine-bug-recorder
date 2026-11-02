@@ -15,20 +15,21 @@
 
   "background": {
     "service_worker": "background/service-worker.js",
+    "scripts": ["background/service-worker.js"],
     "type": "module"
   },
 
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content/vue-probe.js"],
+      "js": ["content/probe-serialize.js", "content/vue-probe.js"],
       "run_at": "document_start",
       "world": "MAIN",
       "all_frames": true
     },
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content/recorder.js"],
+      "js": ["content/dom-meta.js", "content/recorder.js"],
       "run_at": "document_idle",
       "all_frames": true
     }

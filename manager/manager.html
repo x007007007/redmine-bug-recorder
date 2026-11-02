@@ -53,18 +53,18 @@
         </div>
         <div class="meta" id="detailMeta"></div>
 
-        <h3>操作步骤(URL 为大步骤,点击/输入为小步骤 · 勾选要提交的步骤)</h3>
-        <div class="row" style="margin-bottom:8px;">
-          <label class="chk"><input id="selAll" type="checkbox" checked /> 全选</label>
+        <h3>操作时间线(URL 为大步骤 · 操作/API/Pinia 按时间交错 · 勾选要提交的步骤)</h3>
+        <div class="row wrap steps-toolbar">
+          <label class="chk"><input id="selAll" type="checkbox" checked /> 全选步骤</label>
           <span class="count" id="selInfo"></span>
+          <input id="searchBox" placeholder="搜索过滤大步骤(URL / 标题 / 步骤内容 / API 路径)" />
+          <select id="sortMode" title="大步骤排序(不改变页面内部顺序)">
+            <option value="desc">最新页面在前</option>
+            <option value="asc">最早页面在前</option>
+          </select>
+          <button type="button" id="btnCollapseAll" class="ghost">折叠/展开全部</button>
         </div>
         <div id="steps"></div>
-
-        <h3>API 交互记录 <span class="count" id="reqCount"></span></h3>
-        <div id="requests"></div>
-
-        <h3>Pinia 状态流 <span class="count" id="piniaCount"></span></h3>
-        <div id="piniaEvents"></div>
 
         <h3>提交 Bug 到 Redmine</h3>
         <form id="bugForm">

@@ -1,0 +1,149 @@
+// 时间线条目行构建:操作行(勾选/截图/删除)、API 行(可展开请求/响应体)、Pinia 行。
+
+import { fmtClock, describeAction, describePiniaEvent } from '../shared/describe.js';
+import { esc, shortenUrl } from './dom.js';
+
+export function buildActionRow(a, opts) {
+  const { num, selected, onToggle, onDelete, onZoom, propsDiff } = opts;
+  const row = document.createElement('div');
+  row.className = 'step entry';
+  if (!selected) row.classList.add('off');
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'step-cb';
+  cb.checked = selected;
+  cb.addEventListener('change', () => onToggle(a.id, cb.checked));
+
+  const time = document.createElement('span');
+  time.className = 'entry-time';
+  time.textContent = fmtClock(a.ts);
+
+  const body = document.createElement('div');
+  body.className = 'body';
+  const what = document.createElement('div');
+  what.className = 'what';
+  what.textContent = `${num ? num + '. ' : ''}${describeAction(a)}`;
+  body.appendChild(what);
+
+  const bits = [];
+  if (a.selector) bits.push(`<code>${esc(a.selector)}</code>`);
+  if (a.kind === 'click' && a.href) bits.push(`→ ${esc(a.href)}`);
+  if (a.value) bits.push(`值: ${esc(String(a.value).slice(0, 120))}`);
+  const sub = document.createElement('div');
+  sub.className = 'sub';
+  sub.innerHTML = bits.join(' · ') || '&nbsp;';
+  body.appendChild(sub);
+
+  const badges = buildBadges(a, propsDiff);
+  if (badges) body.appendChild(badges);
+
+  const img = document.createElement('img');
+  if (a.screenshot) {
+    img.src = a.screenshot;
+    img.title = `小步骤 ${num} 截图`;
+    img.addEventListener('click', () => onZoom(a.screenshot));
+  } else {
+    img.className = 'none';
+    img.alt = '';
+  }
+
+  const del = document.createElement('button');
+  del.className = 'del-btn';
+  del.textContent = '✕';
+  del.title = '删除该步骤';
+  del.addEventListener('click', () => onDelete(a));
+
+  row.append(cb, time, body, img, del);
+  return row;
+}
+
+function buildBadges(a, propsDiff) {
+  if (!a.vue) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'badges';
+  if (a.vue.component) {
+    const comp = document.createElement('span');
+    comp.className = 'badge vue';
+    comp.textContent = `Vue: ${a.vue.component}`;
+    comp.title = a.vue.chain && a.vue.chain.length > 1 ? `组件链 (${a.vue.chain.join(' > ')})` : '';
+    wrap.appendChild(comp);
+  }
+  if (a.vue.props) {
+    const changes = propsDiff && propsDiff.changes ? propsDiff.changes : [];
+    const det = document.createElement('details');
+    det.className = 'badge props';
+    const s = document.createElement('summary');
+    s.textContent = changes.length ? `props (${changes.length} 处变化)` : 'props';
+    det.appendChild(s);
+    const pre = document.createElement('div');
+    pre.className = 'props-body';
+    pre.textContent =
+      a.vue.props + (changes.length ? `\n\n与上次相比:\n${changes.join('\n')}` : '');
+    det.appendChild(pre);
+    wrap.appendChild(det);
+  }
+  if (a.vue.piniaChanges && a.vue.piniaChanges.length) {
+    const pin = document.createElement('span');
+    pin.className = 'badge pinia';
+    const changed = a.vue.piniaChanges.filter((c) => !c.firstSeen);
+    pin.textContent = changed.length ? `Pinia ${changed.length} 变化` : 'Pinia 首次 变化';
+    pin.title = a.vue.piniaChanges.map((c) => `${c.storeId}: ${c.state.slice(0, 200)}`).join('\n');
+    wrap.appendChild(pin);
+  }
+  return wrap.children.length ? wrap : null;
+}
+
+export function buildRequestRow(r) {
+  const d = document.createElement('details');
+  d.className = 'req entry-request' + (r.error || (r.status && r.status >= 400) ? ' bad' : '');
+  d.dataset.id = r.id;
+
+  const sum = document.createElement('summary');
+  const time = document.createElement('span');
+  time.className = 'entry-time';
+  time.textContent = fmtClock(r.ts);
+  const m = document.createElement('span');
+  m.className = 'method';
+  m.textContent = r.method;
+  const u = document.createElement('span');
+  u.className = 'u';
+  u.textContent = shortenUrl(r.url);
+  u.title = r.url;
+  const pill = document.createElement('span');
+  if (r.error) {
+    pill.className = 'status-pill err';
+    pill.textContent = r.error.slice(0, 24);
+  } else {
+    pill.className = 'status-pill' + (r.status >= 400 ? ' bad' : '');
+    pill.textContent = r.status || '?';
+  }
+  const dur = document.createElement('span');
+  dur.className = 'count';
+  dur.textContent = r.durationMs != null ? `${r.durationMs}ms` : '';
+  sum.append(time, m, u, pill, dur);
+
+  const pre1 = document.createElement('pre');
+  pre1.textContent = `请求体:\n${r.requestBody || '(空 / 未捕获)'}`;
+  const pre2 = document.createElement('pre');
+  if (r.responseBody !== undefined) {
+    pre2.textContent = `响应体:\n${r.responseBody === null ? '(非文本内容,不展示)' : r.responseBody || '(空)'}`;
+  } else {
+    pre2.textContent = '响应体:未捕获(需开启"捕获 API 请求/响应体",仅 Chrome)';
+  }
+  d.append(sum, pre1, pre2);
+  return d;
+}
+
+export function buildPiniaRow(ev) {
+  const row = document.createElement('div');
+  row.className = 'entry entry-pinia';
+  const time = document.createElement('span');
+  time.className = 'entry-time';
+  time.textContent = fmtClock(ev.ts);
+  const line = document.createElement('span');
+  line.className = 'pinia-line';
+  line.textContent = describePiniaEvent(ev);
+  row.append(time, line);
+  return row;
+}

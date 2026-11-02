@@ -4,15 +4,17 @@
 
 ## 功能
 
-- **操作录制**:点击、键盘输入(防抖合并)、下拉选择、表单提交、页面跳转(SPA 路由变化也算一步)
-- **每步自动截图**:每次操作约 380ms 后截取可视区域(JPEG),UI 渲染完成后再截
+- **操作录制**:点击、键盘输入(防抖合并)、下拉选择、表单提交、页面跳转(SPA 路由变化也算一步);**可跨标签页**(页面标题会标注「标签页 N」)
+- **每步自动截图**:每次操作约 380ms 后截取可视区域(JPEG);若期间已切走标签页则跳过,宁缺勿错
 - **API 交互捕获**:URL / 方法 / 状态码 / 耗时 / 请求体;开启"捕获请求响应体"后还含响应体与 Console 错误(chrome.debugger,仅 Chrome)
-- **URL 大步骤分组**:每个 URL 是一个大步骤(页面),组内的点击/输入是小步骤
+- **统一时间线**:URL 为大步骤(页面,含起止时间与先后顺序),页面内操作 / API / Pinia 事件**按时间交错记录**,不再分区展示
+- **大步骤视图**:默认最新页面在前,可切正序/逆序(只排页面,不动页内顺序);支持搜索过滤与折叠
+- **步骤删除**:每个小步骤与整页均可删除,描述与截图联动更新
 - **Vue 优化**(针对 Vue 3 + Pinia 项目):
   - 每个操作标注所在 Vue 组件(名称 + 组件链,如 `AddOrderForm (AddOrderForm > OrderApp)`)
   - 组件 props 点击时刻快照,并与上次同组件 diff:`title: "" → "三体"`
   - Pinia:`$subscribe` 记录状态变更流(哪个 store / 哪些 key)、`$onAction` 记录 action 调用、每次操作对比 store 快照
-- **步骤勾选 + review 后提交**:值原样记录(不做脱敏),测试人员在管理页勾选要提交的步骤、可编辑描述后,才上传截图并创建 issue
+- **步骤勾选 + review 后提交**:值原样记录(不做脱敏),测试人员在管理页勾选要提交的步骤、可编辑描述后,才上传截图并创建 issue(Redmine 描述中的步骤始终按时间正序)
 - **一键提交 Redmine**:`POST /uploads.json` 上传 `step-NN.jpg` → `POST /issues.json` 创建 issue(支持项目/跟踪/优先级)
 
 ## 安装
@@ -77,19 +79,36 @@ Firefox 用 `manifest.firefox.json`(无 `chrome.debugger`,响应体/Console 不�
 
 ## 项目结构
 
+约定:所有 JS 模块 ≤ 200 行左右,便于维护。
+
 ```
-manifest.json            Chrome MV3(含 MAIN world Vue 探针声明)
+manifest.json            Chrome MV3(background 双写 service_worker+scripts,Firefox 也能载)
 manifest.firefox.json    Firefox MV3 变体
-background/service-worker.js   录制编排:截图管线 / webRequest+CDP 网络捕获 / Redmine 提交
-content/recorder.js      隔离世界:DOM 事件录制 + 主世界探针桥
-content/vue-probe.js     主世界:Vue 组件/props/Pinia 捕获
-shared/db.js             IndexedDB(sessions/actions/requests/logs/pinia)
-shared/report.js         Markdown 描述生成(分组/勾选过滤/props diff)
-shared/redmine.js        Redmine REST API 客户端
+background/
+  service-worker.js      入口(注册各模块监听器)
+  state.js               录制状态 / 设置 / 徽章 / 通知
+  net-capture.js         webRequest 捕获(元数据+请求体)
+  net-cdp.js             chrome.debugger 捕获(响应体+Console,仅 Chrome)
+  recorder.js            开始/停止、操作与 Pinia 事件入库、截图管线(防拍错标签页)
+  sessions.js            会话查询 / 删除(会话级与条目级)
+  redmine-submit.js      连接测试 / 下拉数据 / 提交 issue
+  router.js              消息路由
+content/
+  dom-meta.js            (隔离世界)选择器 / 字段标签工具
+  recorder.js            (隔离世界)事件录制 + 主世界探针桥
+  probe-serialize.js     (主世界)安全序列化
+  vue-probe.js           (主世界)Vue 组件/props/Pinia 捕获
+shared/
+  describe.js            可读文案与时间格式
+  timeline.js            统一时间线:页面分组 / 归属 / 排序 / 搜索 / props diff
+  report.js              Redmine 描述生成(页面内操作与 API 交错)
+  db.js                  IndexedDB(sessions/actions/requests/logs/pinia)
+  redmine.js             Redmine REST API 客户端
 popup/                   弹窗(开始/停止/入口)
-manager/                 管理页(会话/步骤勾选/API/Pinia/提交表单/设置)
+manager/                 管理页模块:store / dom / api / settings-ui / sessions-ui /
+                         entry-ui / page-ui / steps-ui / report-ui
 demo/                    本地演示:普通页 + Vue3+Pinia 页 + 假 Redmine
-tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,28 项断言)
+tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,33 项断言)
 tools/gen_icons.py       图标生成
 ```
 

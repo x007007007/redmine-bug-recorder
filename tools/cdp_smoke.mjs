@@ -278,12 +278,12 @@ ok('Pinia 事件流($onAction 捕获 addOrder/removeOrder)', piniaInfo.count >= 
 const reqInfo = await evalJs(
   manager.sessionId,
   `(() => {
-    const n = document.querySelectorAll('.req').length;
-    const bad = document.querySelectorAll('.req.bad').length;
-    const first = document.querySelector('.req');
+    const reqs = [...document.querySelectorAll('.entry-request')];
+    const bad = reqs.filter(d => d.classList.contains('bad')).length;
+    const login = reqs.find(d => d.textContent.includes('login'));
     let bodyShown = false;
-    if (first) { first.open = true; bodyShown = [...first.querySelectorAll('pre')].some(p => p.textContent.includes('username')); }
-    return { n, bad, bodyShown };
+    if (login) { login.open = true; bodyShown = [...login.querySelectorAll('pre')].some(p => p.textContent.includes('username')); }
+    return { n: reqs.length, bad, bodyShown };
   })()`
 );
 ok('API 交互已捕获(≥5 个请求)', reqInfo.n >= 5, `共 ${reqInfo.n} 个,失败标记 ${reqInfo.bad} 个`);
@@ -323,6 +323,65 @@ ok('描述包含 Pinia action 调用(orders.addOrder)', desc.includes('orders.ad
 ok('描述包含 Pinia 状态变化行', desc.includes('Pinia store'), '');
 ok('描述包含 URL 大步骤标题', desc.includes('大步骤'), '');
 ok('描述包含 500 错误 API', /api\/fail[\s\S]{0,120}500/.test(desc.replace(/\n/g, ' ')) || /500/.test(desc), '');
+ok('描述含页面时间与顺序(大步骤 N · HH:MM:SS)', /大步骤 \d+ · 页面 .+ · \d{2}:\d{2}:\d{2}/.test(desc), '');
+
+/* 7.5 视图功能:删除 / 排序 / 搜索 / 折叠 */
+const rowsBefore = await evalJs(manager.sessionId, `document.querySelectorAll('#steps .step').length`);
+const delOk = await evalJs(
+  manager.sessionId,
+  `(() => {
+    window.confirm = () => true;
+    const rows = [...document.querySelectorAll('#steps .step')];
+    const row = rows.find(r => r.querySelector('.what').textContent.includes('在「产品」中选择'));
+    if (!row) return false;
+    row.querySelector('.del-btn').click();
+    return true;
+  })()`
+);
+await sleep(500);
+const rowsAfter = await evalJs(manager.sessionId, `document.querySelectorAll('#steps .step').length`);
+const descAfterDel = await evalJs(manager.sessionId, `document.getElementById('bugDescription').value`);
+ok(
+  '逐步骤删除(行数-1,描述联动移除该步)',
+  delOk === true && rowsAfter === rowsBefore - 1 && !descAfterDel.includes('在「产品」中选择'),
+  `${rowsBefore}→${rowsAfter}`
+);
+
+const firstTitleDesc = await evalJs(manager.sessionId, `document.querySelector('.page-title').textContent`);
+await evalJs(
+  manager.sessionId,
+  `(() => { const s = document.getElementById('sortMode'); s.value = 'asc'; s.dispatchEvent(new Event('change')); return true; })()`
+);
+await sleep(300);
+const firstTitleAsc = await evalJs(manager.sessionId, `document.querySelector('.page-title').textContent`);
+await evalJs(
+  manager.sessionId,
+  `(() => { const s = document.getElementById('sortMode'); s.value = 'desc'; s.dispatchEvent(new Event('change')); return true; })()`
+);
+ok(
+  '大步骤排序切换(默认最新在前;内部顺序不受影响)',
+  /vue\.html/.test(firstTitleDesc) && !/vue\.html/.test(firstTitleAsc),
+  ''
+);
+
+const totalGroups = await evalJs(manager.sessionId, `document.querySelectorAll('.page-group').length`);
+await evalJs(
+  manager.sessionId,
+  `(() => { const s = document.getElementById('searchBox'); s.value = 'vue.html'; s.dispatchEvent(new Event('input')); return true; })()`
+);
+await sleep(300);
+const filteredGroups = await evalJs(manager.sessionId, `document.querySelectorAll('.page-group').length`);
+await evalJs(
+  manager.sessionId,
+  `(() => { const s = document.getElementById('searchBox'); s.value = ''; s.dispatchEvent(new Event('input')); return true; })()`
+);
+ok('搜索过滤大步骤', filteredGroups >= 1 && filteredGroups < totalGroups, `${totalGroups}→${filteredGroups}`);
+
+await evalJs(manager.sessionId, `document.querySelector('.page-head .caret').click(); true`);
+await sleep(250);
+const collapsedCount = await evalJs(manager.sessionId, `document.querySelectorAll('.page-group.collapsed').length`);
+await evalJs(manager.sessionId, `document.querySelector('.page-head .caret').click(); true`);
+ok('大步骤折叠/展开', collapsedCount >= 1, `${collapsedCount} 个折叠`);
 
 /* 8. 提交到假 Redmine */
 const shotsBefore = fs.existsSync(FAKE_STORE)
