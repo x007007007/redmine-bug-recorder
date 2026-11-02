@@ -122,9 +122,20 @@ devtools/                DevTools 面板:panel(编排)/ panel-state / panel-sess
 background/selection.ts  勾选集合持久化(storage.session,面板 ↔ 提交页共享)
 demo/                    本地演示:普通页 + Vue3+Pinia 页 + 假 Redmine
 tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,50 项断言,加载 dist/)
+tools/make-release.mjs   发布打包(Chrome zip + Firefox xpi → release/)
 tools/gen_icons.py       图标生成
 dist/                    构建产物(浏览器实际加载的目录,gitignore)
 ```
+
+## 发布打包
+
+```bash
+npm run release   # tsc 检查 → 构建 → 产出 release/ 下两个包:
+                  #   bug-recorder-chrome-v{ver}.zip   (Chrome Web Store)
+                  #   bug-recorder-firefox-v{ver}.xpi  (AMO,包内已是 firefox manifest)
+```
+
+版本号在 `manifest.json` / `manifest.firefox.json` 的 `version` 字段,发版前同步递增(两文件保持一致)。
 
 ## 本地联调 / 测试
 

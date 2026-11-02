@@ -9,8 +9,8 @@
     "build": "npm run typecheck && node build.mjs",
     "build:fast": "node build.mjs",
     "watch": "node build.mjs --watch",
-    "smoke": "node tools/cdp_smoke.mjs 9223 bkeogdmbgodhopooimgmbacldmdmpeap \"$PWD\"",
-    "zip": "cd dist && zip -rq ../bug-recorder-extension.zip ."
+    "release": "npm run typecheck && node tools/make-release.mjs",
+    "smoke": "node tools/cdp_smoke.mjs 9223 bkeogdmbgodhopooimgmbacldmdmpeap \"$PWD\""
   },
   "devDependencies": {
     "@types/chrome": "^0.3.7",
