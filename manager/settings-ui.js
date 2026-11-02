@@ -60,7 +60,14 @@ export async function loadProjects() {
   try {
     const projects = await send({ type: 'LIST_PROJECTS' });
     fillSelect($('bugProject'), projects, store.settings.projectId, '(请选择项目)');
-    if (!projects.length) showError(new Error('项目列表为空:请确认 API Key 所属账号有项目权限'));
+    if (!projects.length) {
+      showError(
+        new Error(
+          '项目列表为空:Redmine 只返回该账号"可见"的项目。请检查:1) 该账号是否已是至少一个项目的成员(管理 → 项目 → 成员);' +
+            '2) 用浏览器登录 Redmine 打开 /projects.json 对比可见性。也可在下方"手动填项目标识"直接提交。'
+        )
+      );
+    }
   } catch (e) {
     showError(e);
   }

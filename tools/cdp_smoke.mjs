@@ -453,20 +453,37 @@ const picked = await evalJs(
 );
 await sleep(300);
 const rangeReady = await evalJs(panel.sessionId, `document.getElementById('btnSubmitRange').hidden === false`);
-ok('DevTools 面板:时间轴选区(起止两张截图)', picked === true && rangeReady === true, '');
+const rangeText1 = await evalJs(panel.sessionId, `document.getElementById('rangeInfo').textContent`);
+ok('DevTools 面板:时间轴选区(起止两张截图)', picked === true && rangeReady === true, rangeText1);
+/* 10. 面板自动打开的新提交页:应用选区范围(一次性消费) */
+const beforeMgrIds = new Set(
+  ((await cdp.send('Target.getTargets')).targetInfos)
+    .filter((t) => t.url.includes('manager.html'))
+    .map((t) => t.targetId)
+);
 await evalJs(panel.sessionId, `document.getElementById('btnSubmitRange').click(); true`);
-await sleep(400);
-const rangeStored = await evalJs(panel.sessionId, `chrome.storage.session.get('submitRange').then(v => !!v.submitRange)`);
-ok('选区写入 storage 供提交页使用', rangeStored === true, '');
-
-/* 10. 管理页应用选区范围 */
-await evalJs(manager.sessionId, `location.reload(); true`);
-await sleep(1500);
-await waitFor(manager.sessionId, `window.__bugrecMgrReady === true`, '管理页重载完成');
-const scopeText = await evalJs(manager.sessionId, `document.getElementById('scopeInfo').textContent`);
-ok('管理页应用时间轴选区范围', /时间轴选区/.test(scopeText), scopeText.slice(0, 60));
-const scopedDesc = await evalJs(manager.sessionId, `document.getElementById('bugDescription').value`);
-ok('选区外步骤不进入描述', !scopedDesc.includes('在「用户名」中输入'), '');
+await sleep(600);
+const rangeText2 = await evalJs(panel.sessionId, `document.getElementById('rangeInfo').textContent`);
+ok('选区保存成功(面板确认)', /选区已保存/.test(rangeText2), rangeText2);
+const newMgrs = ((await cdp.send('Target.getTargets')).targetInfos).filter(
+  (t) => t.type === 'page' && t.url.includes('manager.html') && !beforeMgrIds.has(t.targetId)
+);
+ok('面板自动打开提交页', newMgrs.length >= 1, `新开 ${newMgrs.length} 页`);
+const nm = await (async () => {
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId: newMgrs[0].targetId, flatten: true });
+  await cdp.send('Page.enable', {}, sessionId);
+  await cdp.send('Runtime.enable', {}, sessionId);
+  return { sessionId };
+})();
+await waitFor(nm.sessionId, `window.__bugrecMgrReady === true`, '新提交页初始化');
+const scopeText = await evalJs(nm.sessionId, `document.getElementById('scopeInfo').textContent`);
+ok('提交页应用时间轴选区范围', /时间轴选区/.test(scopeText), scopeText.slice(0, 70));
+const scopedDesc = await evalJs(nm.sessionId, `document.getElementById('bugDescription').value`);
+ok(
+  '选区外步骤不进入描述',
+  !scopedDesc.includes('在「用户名」中输入') && scopedDesc.includes('AddOrderForm'),
+  ''
+);
 
 console.log('SMOKE_DONE');
 console.log(JSON.stringify(results, null, 2));

@@ -6,16 +6,19 @@ import { fmtClock } from '../shared/describe.js';
 
 export const DEFAULT_MAX_ACTIONS = 100;
 
-// 读取并清除一次性选区(仅当属于当前会话)
+// 读取并清除一次性选区(仅当属于当前会话);storage.session 不可用时兜底 local
 export async function readPendingRange(sessionId) {
-  try {
-    const { submitRange } = await chrome.storage.session.get('submitRange');
-    if (submitRange && submitRange.sessionId === sessionId) {
-      await chrome.storage.session.remove('submitRange');
-      return submitRange; // { fromTs, toTs }
+  const areas = [chrome.storage.session, chrome.storage.local].filter(Boolean);
+  for (const area of areas) {
+    try {
+      const { submitRange } = await area.get('submitRange');
+      if (submitRange && submitRange.sessionId === sessionId) {
+        await area.remove('submitRange');
+        return submitRange; // { fromTs, toTs }
+      }
+    } catch {
+      /* 尝试下一个区域 */
     }
-  } catch {
-    /* ignore */
   }
   return null;
 }

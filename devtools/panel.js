@@ -98,17 +98,21 @@ function renderTimeline() {
 
 function onThumbClick(a) {
   if (state.rangeMode) {
-    if (state.rangeFromTs == null || (state.range.fromTs && state.range.toTs)) {
-      state.range = { fromTs: a.ts, toTs: a.ts };
+    if (state.rangeFromTs == null) {
+      // 第一下:选起点
       state.rangeFromTs = a.ts;
-    } else {
-      const from = Math.min(state.range.fromTs, a.ts);
-      const to = Math.max(state.range.fromTs, a.ts);
-      state.range = { fromTs: from, toTs: to };
+      state.range = null;
+      $('rangeInfo').textContent = `起点 ${clockOf(a.ts)} 已选,再点击终点截图`;
+      $('btnClearRange').hidden = false;
+      renderTimeline();
+      return;
     }
-    const n = state.cache.actions.filter((x) => x.ts >= state.range.fromTs && x.ts <= state.range.toTs).length;
-    $('rangeInfo').textContent = `选区 ${clockOf(state.range.fromTs)} ~ ${clockOf(state.range.toTs)}(约 ${n} 步)`;
-    $('btnClearRange').hidden = false;
+    // 第二下:起止两点成区间
+    const from = Math.min(state.rangeFromTs, a.ts);
+    const to = Math.max(state.rangeFromTs, a.ts);
+    state.range = { fromTs: from, toTs: to };
+    const n = state.cache.actions.filter((x) => x.ts >= from && x.ts <= to).length;
+    $('rangeInfo').textContent = `选区 ${clockOf(from)} ~ ${clockOf(to)}(约 ${n} 步),可按此范围去提交`;
     $('btnSubmitRange').hidden = false;
     renderTimeline();
     return;
@@ -149,11 +153,25 @@ function clearRange() {
 }
 
 async function submitRange() {
-  if (!state.range || !state.sessionId) return;
+  if (!state.range) {
+    $('rangeInfo').textContent = '请先点击起点与终点两张截图';
+    return;
+  }
+  if (!state.sessionId) {
+    $('rangeInfo').textContent = '会话未就绪(尚未开始录制?),无法设置范围';
+    return;
+  }
+  const payload = { sessionId: state.sessionId, fromTs: state.range.fromTs, toTs: state.range.toTs };
+  // session 区不可用时兜底到 local(两者提交页都能读到)
   try {
-    await chrome.storage.session.set({
-      submitRange: { sessionId: state.sessionId, fromTs: state.range.fromTs, toTs: state.range.toTs },
-    });
+    try {
+      await chrome.storage.session.set({ submitRange: payload });
+    } catch {
+      await chrome.storage.local.set({ submitRange: payload });
+    }
+    const back = await (chrome.storage.session || chrome.storage.local).get('submitRange');
+    if (!back || !back.submitRange) throw new Error('写入后读回为空');
+    $('rangeInfo').textContent = `选区已保存(${clockOf(payload.fromTs)} ~ ${clockOf(payload.toTs)}),已打开提交页`;
     const url = chrome.runtime.getURL('manager/manager.html');
     try {
       chrome.tabs.create({ url });
@@ -161,7 +179,7 @@ async function submitRange() {
       window.open(url, '_blank');
     }
   } catch (e) {
-    $('rangeInfo').textContent = '设置选区失败: ' + e.message;
+    $('rangeInfo').textContent = '设置选区失败: ' + ((e && e.message) || e);
   }
 }
 

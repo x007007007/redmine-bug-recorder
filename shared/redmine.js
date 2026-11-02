@@ -41,8 +41,19 @@ export async function testConnection(settings) {
 }
 
 export async function listProjects(settings) {
-  const data = await apiFetch(settings, '/projects.json?limit=100&status=*');
-  return (data.projects || []).map((p) => ({ id: p.id, name: p.name }));
+  // 分页拉取(Redmine 默认每页 25);仅返回该账号可见的项目
+  const out = [];
+  let offset = 0;
+  const limit = 100;
+  for (let i = 0; i < 10; i++) {
+    const data = await apiFetch(settings, `/projects.json?limit=${limit}&offset=${offset}&status=*`);
+    const list = (data && data.projects) || [];
+    out.push(...list.map((p) => ({ id: p.id, name: p.name, identifier: p.identifier })));
+    const total = data && data.total_count != null ? Number(data.total_count) : out.length;
+    offset += limit;
+    if (!list.length || out.length >= total) break;
+  }
+  return out;
 }
 
 export async function listTrackers(settings) {

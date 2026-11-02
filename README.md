@@ -15,7 +15,12 @@
   - 组件 props 点击时刻快照,并与上次同组件 diff:`title: "" → "三体"`
   - Pinia:`$subscribe` 记录状态变更流(哪个 store / 哪些 key)、`$onAction` 记录 action 调用、每次操作对比 store 快照
 - **步骤勾选 + review 后提交**:值原样记录(不做脱敏),测试人员在管理页勾选要提交的步骤、可编辑描述后,才上传截图并创建 issue(Redmine 描述中的步骤始终按时间正序)
-- **一键提交 Redmine**:`POST /uploads.json` 上传 `step-NN.jpg` → `POST /issues.json` 创建 issue(支持项目/跟踪/优先级)
+- **提交范围**:默认只取**最近 100 步**;DevTools 面板可在时间轴上框选区间,提交页按区间裁剪(可"查看全部 / 恢复默认")
+- **截图限量**:提交时"最多附加截图 N 张"(超出取最近),避免 issue 附件爆炸
+- **点击标记**:点击类操作记录视口坐标;截图缩略图/大图/上传件上叠加半透明点击标记(上传件用 OffscreenCanvas 烙入 PNG 透明通道)
+- **CSV 导出**:操作/API/Pinia 按时间交错导出 CSV(Excel 可开),截图列含 base64
+- **DevTools 面板**(类似 Vue Devtools):时间轴缩略图条(点击定位大步骤)、大步骤分页列表、选范围一键去提交
+- **一键提交 Redmine**:`POST /uploads.json` → `POST /issues.json`;项目支持列表选择或**手动填项目标识/ID**(列表为空时仍可提交)
 
 ## 安装
 
@@ -47,13 +52,15 @@ Firefox 用 `manifest.firefox.json`(无 `chrome.debugger`,响应体/Console 不�
 
 ## 使用流程
 
-1. 管理页或弹窗点 **「开始录制」**
-2. 在业务页面正常操作(新开标签页也会被记录)
-3. 发现 Bug 后回到管理页:
-   - 左侧会话列表选择会话
-   - **勾选**与 Bug 相关的大步骤/小步骤(描述实时联动)
-   - **review 描述**(输入值原样记录,可编辑;Markdown 格式)
-   - 选择项目 → **「提交到 Redmine」**,得到 issue 链接(截图按 `step-NN.jpg` 附件上传)
+1. 管理页、弹窗或 **DevTools 面板**(F12 → 「Bug Recorder」标签页)点 **「开始录制」**
+2. 在业务页面正常操作(跨标签页也会被记录)
+3. 发现 Bug 后回到提交页(管理页):
+   - 左侧选择会话;默认只加载最近 100 步,可"查看全部"
+   - **勾选**相关步骤(描述实时联动)、可删除无关步骤
+   - **review 描述**(输入值原样记录,可编辑;Markdown)
+   - 选择项目(或手动填项目标识)→ **「提交到 Redmine」**,截图按 `step-NN.jpg/png` 附件上传(限量可调)
+
+DevTools 面板的时间轴:每步截图按时间排列,点击缩略图定位到对应大步骤;勾选"选范围"后依次点击两张截图成区间 → 「按此范围去提交」自动打开提交页并裁剪。大步骤多时列表自动分页(每页 5 个)。
 
 ## 生成的 issue 描述格式
 
@@ -106,9 +113,10 @@ shared/
   redmine.js             Redmine REST API 客户端
 popup/                   弹窗(开始/停止/入口)
 manager/                 管理页模块:store / dom / api / settings-ui / sessions-ui /
-                         entry-ui / page-ui / steps-ui / report-ui
+                         entry-ui / page-ui / steps-ui / report-ui / range / export-csv
+devtools/                DevTools 面板(devtools.js 注册 + panel 时间轴/分页/选区)
 demo/                    本地演示:普通页 + Vue3+Pinia 页 + 假 Redmine
-tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,33 项断言)
+tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,40 项断言)
 tools/gen_icons.py       图标生成
 ```
 
@@ -142,6 +150,8 @@ node tools/cdp_smoke.mjs 9223 bkeogdmbgodhopooimgmbacldmdmpeap "$PWD"
 - `captureVisibleTab` 要求 `<all_urls>` 权限(已声明);浏览器受保护页面(chrome:// 等)无法截图,自动跳过
 - 键盘输入按 700ms 防抖合并为一条"输入"步骤;回车单独记一步
 - iframe 内操作可记录(content script all_frames);跨域 iframe 截图无碍(截的是整页可视区)
+- **Redmine 项目列表为空**属服务端可见性:`/projects.json` 只返回该账号可见的项目,普通账号须先成为某项目成员(或用管理员账号);插件已支持手动填项目标识/ID 直接提交
+- DevTools 面板仅 Chrome 系(Firefox 不支持 chrome.devtools API 时面板不注册,其余功能不受影响)
 
 ## 后续可扩展
 

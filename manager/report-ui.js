@@ -67,6 +67,11 @@ async function onCopy() {
 async function onSubmit(e) {
   e.preventDefault();
   if (!store.cache) return;
+  const projectId = $('bugProjectManual').value.trim() || $('bugProject').value;
+  if (!projectId) {
+    showError(new Error('请先载入并选择项目,或在"手动填项目标识"中填写(Redmine 项目页 URL 中的标识或数字 ID)'));
+    return;
+  }
   const btn = $('btnSubmit');
   btn.disabled = true;
   btn.textContent = '提交中…';
@@ -77,7 +82,7 @@ async function onSubmit(e) {
       sessionId: store.cache.session.id,
       subject: $('bugSubject').value.trim(),
       description: $('bugDescription').value,
-      projectId: $('bugProject').value,
+      projectId,
       trackerId: $('bugTracker').value,
       priorityId: $('bugPriority').value,
       attachScreenshots: $('bugAttach').checked,
