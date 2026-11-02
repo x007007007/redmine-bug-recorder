@@ -27,7 +27,7 @@ const entries = [
   { in: 'popup/popup.ts', out: 'popup/popup.js', format: 'esm' },
   { in: 'manager/manager.ts', out: 'manager/manager.js', format: 'esm' },
   { in: 'devtools/devtools.ts', out: 'devtools/devtools.js', format: 'iife' },
-  { in: 'devtools/panel.ts', out: 'devtools/panel.js', format: 'esm' },
+  { in: 'devtools/panel.ts', out: 'devtools/panel.js', format: 'iife' },
 ];
 
 async function copyStatic() {
