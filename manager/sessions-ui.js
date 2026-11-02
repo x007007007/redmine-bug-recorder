@@ -6,6 +6,7 @@ import { store } from './store.js';
 import { fmtTime } from '../shared/describe.js';
 import { renderAll } from './steps-ui.js';
 import { prefillForm } from './report-ui.js';
+import { readPendingRange, applyScope, renderScopeBanner } from './range.js';
 
 export async function refreshSessions() {
   store.sessions = await send({ type: 'LIST_SESSIONS' });
@@ -52,6 +53,8 @@ function buildSessionItem(s) {
     if (store.currentId === s.id) {
       store.currentId = null;
       store.cache = null;
+      store.full = null;
+      store.scope = null;
       setDetailVisible(false);
       renderAll();
     }
@@ -71,15 +74,22 @@ export async function selectSession(id) {
   document.querySelectorAll('.session').forEach((el) => el.classList.toggle('sel', el.dataset.id === id));
   if (!id) return;
   try {
-    store.cache = await send({ type: 'GET_SESSION', id });
+    const full = await send({ type: 'GET_SESSION', id });
+    const range = await readPendingRange(id);
+    const { cache, scope } = applyScope(full, range, store.fullScope);
+    store.full = full;
+    store.cache = cache;
+    store.scope = scope;
   } catch (e) {
     store.cache = null;
+    store.scope = null;
     showError(e);
     return;
   }
   store.selected = new Set(store.cache.actions.map((a) => a.id)); // 默认全选,review 时可取消
   setDetailVisible(true);
   renderAll();
+  renderScopeBanner();
   prefillForm();
 }
 

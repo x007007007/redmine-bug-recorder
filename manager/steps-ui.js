@@ -3,7 +3,8 @@
 import { send } from './api.js';
 import { $, showError } from './dom.js';
 import { store } from './store.js';
-import { buildPages, sortPages, filterPages, computePropsDiffs, assignShotNames, buildTabLabels } from '../shared/timeline.js';
+import { buildPages, sortPages, filterPages, computePropsDiffs, buildTabLabels } from '../shared/timeline.js';
+import { planShotUploads } from '../shared/shots.js';
 import { buildPageGroup } from './page-ui.js';
 import { regenerateDescription } from './report-ui.js';
 
@@ -30,7 +31,7 @@ export function renderAll() {
   if (!store.cache) return;
   const ctx = {
     propsDiffs: computePropsDiffs(store.cache.actions),
-    shots: assignShotNames(store.cache.actions),
+    shots: new Map(planShotUploads(store.cache.actions).map((p) => [p.actionId, p.filename])),
     tabMap: buildTabLabels(store.cache.actions),
     multiTab: buildTabLabels(store.cache.actions).size > 1,
   };
@@ -52,8 +53,16 @@ export function renderAll() {
     },
     onDeleteAction: (a) => deleteAction(a),
     onDeletePage: (p) => deletePage(p),
-    onZoom: (src) => {
-      $('lightboxImg').src = src;
+    onZoom: (a) => {
+      $('lightboxImg').src = a.screenshot;
+      const m = $('lightboxMarker');
+      if (a.point && a.viewport) {
+        m.style.left = (a.point.x / a.viewport.w) * 100 + '%';
+        m.style.top = (a.point.y / a.viewport.h) * 100 + '%';
+        m.hidden = false;
+      } else {
+        m.hidden = true;
+      }
       $('lightbox').hidden = false;
     },
   };

@@ -5,6 +5,7 @@ import { $, showError } from './dom.js';
 import { store } from './store.js';
 import { buildDescription, buildSubject } from '../shared/report.js';
 import { selectedActions } from './steps-ui.js';
+import { buildCsv } from './export-csv.js';
 
 export function init() {
   $('bugSubject').addEventListener('input', () => (store.subjectDirty = true));
@@ -19,7 +20,13 @@ export function init() {
     loadProjects();
   });
   $('btnExport').addEventListener('click', onExport);
+  $('btnExportCsv').addEventListener('click', onExportCsv);
   $('bugForm').addEventListener('submit', onSubmit);
+}
+
+function shotLimit() {
+  const n = Number($('bugShotMax') && $('bugShotMax').value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 export function prefillForm() {
@@ -43,7 +50,7 @@ export function regenerateDescription() {
     requests,
     logs,
     { userAgent: navigator.userAgent, lastUrl },
-    { piniaEvents: pinia }
+    { piniaEvents: pinia, shotLimit: shotLimit() }
   );
 }
 
@@ -75,6 +82,7 @@ async function onSubmit(e) {
       priorityId: $('bugPriority').value,
       attachScreenshots: $('bugAttach').checked,
       selectedActionIds: [...store.selected],
+      shotLimit: shotLimit(),
     });
     $('submitResult').innerHTML =
       `✅ 已创建 issue <b>#${res.issueId}</b>(含 ${res.uploadCount} 张截图):` +
@@ -99,6 +107,17 @@ function onExport() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `bug-recorder-session-${session.id.slice(0, 8)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function onExportCsv() {
+  if (!store.cache) return;
+  const csv = buildCsv(store.cache);
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `bug-recorder-session-${store.cache.session.id.slice(0, 8)}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 }

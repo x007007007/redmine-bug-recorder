@@ -58,6 +58,9 @@
       if (!(e.target instanceof Element)) return;
       const el = e.target.closest(INTERACTIVE) || e.target;
       const action = Object.assign({ kind: 'click' }, baseMeta(el));
+      // 记录点击坐标(视口 CSS 像素),供截图标注点击位置
+      action.point = { x: Math.round(e.clientX), y: Math.round(e.clientY) };
+      action.viewport = { w: window.innerWidth, h: window.innerHeight };
       if (el.tagName === 'A' && el.href) action.href = el.href;
       const dv = clickValue(el);
       if (dv) Object.assign(action, dv);

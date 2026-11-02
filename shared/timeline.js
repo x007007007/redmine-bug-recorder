@@ -119,16 +119,6 @@ export function computePropsDiffs(actions) {
   return out;
 }
 
-// 截图附件命名:与提交/描述共用同一顺序(actions 数组顺序)
-export function assignShotNames(actions) {
-  const names = new Map();
-  let n = 0;
-  for (const a of actions) {
-    if (a.screenshot) names.set(a.id, `step-${String(++n).padStart(2, '0')}.jpg`);
-  }
-  return names;
-}
-
 // 跨标签页展示:按首次出现顺序给 tabId 编号
 export function buildTabLabels(actions) {
   const map = new Map();

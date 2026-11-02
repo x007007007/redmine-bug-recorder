@@ -383,11 +383,12 @@ const collapsedCount = await evalJs(manager.sessionId, `document.querySelectorAl
 await evalJs(manager.sessionId, `document.querySelector('.page-head .caret').click(); true`);
 ok('大步骤折叠/展开', collapsedCount >= 1, `${collapsedCount} 个折叠`);
 
-/* 8. 提交到假 Redmine */
+/* 8. 提交到假 Redmine(截图限量 5 张:有点击坐标的烙为 PNG) */
 const shotsBefore = fs.existsSync(FAKE_STORE)
-  ? fs.readdirSync(FAKE_STORE).filter((f) => f.startsWith('step-') && f.endsWith('.jpg')).length
+  ? fs.readdirSync(FAKE_STORE).filter((f) => f.startsWith('step-')).length
   : 0;
 await evalJs(manager.sessionId, `document.getElementById('bugAttach').checked = true; true`);
+await evalJs(manager.sessionId, `document.getElementById('bugShotMax').value = '5'; true`);
 await evalJs(manager.sessionId, `document.getElementById('bugForm').requestSubmit(); true`);
 try {
   await waitFor(
@@ -403,8 +404,14 @@ try {
 }
 
 const filesAfter = fs.existsSync(FAKE_STORE) ? fs.readdirSync(FAKE_STORE) : [];
-const shotFiles = filesAfter.filter((f) => f.startsWith('step-') && f.endsWith('.jpg'));
-ok('截图附件按 step-NN.jpg 上传', shotFiles.length >= 5, `服务端收到 ${shotFiles.length} 张(此前 ${shotsBefore})`);
+const shotFiles = filesAfter.filter((f) => /^step-\d+\.(jpg|png)$/.test(f));
+const pngFiles = shotFiles.filter((f) => f.endsWith('.png'));
+ok('截图限量生效(最多 5 张)', shotFiles.length === 5, `服务端收到 ${shotFiles.length} 张(此前 ${shotsBefore})`);
+ok(
+  '点击标记烙入截图(PNG 透明通道)+ JPEG 混合上传',
+  pngFiles.length >= 1 && shotFiles.some((f) => f.endsWith('.jpg')),
+  `PNG ${pngFiles.length} 张 / JPEG ${shotFiles.length - pngFiles.length} 张`
+);
 const lastIssue = JSON.parse(fs.readFileSync(path.join(FAKE_STORE, 'last-issue.json'), 'utf8'));
 ok(
   '假 Redmine 收到的 issue 内容校验',
@@ -413,6 +420,53 @@ ok(
     lastIssue.issue.description.includes('AddOrderForm'),
   `project=${lastIssue.issue.project_id}, 描述 ${lastIssue.issue.description.length} 字符, 附件 ${lastIssue.issue.uploads?.length || 0} 个`
 );
+
+/* 8.5 CSV 导出 */
+const csvCheck = await evalJs(
+  manager.sessionId,
+  `Promise.all([import('./export-csv.js'), chrome.runtime.sendMessage({type:'LIST_SESSIONS'})]).then(async ([m, ss]) => {
+     const data = await chrome.runtime.sendMessage({type:'GET_SESSION', id: ss[0].id});
+     const csv = m.buildCsv(data);
+     return { len: csv.length, hasB64: /A[A-Za-z0-9+\\/]{80,}/.test(csv), hasApi: csv.includes('API'), head: csv.split('\\r\\n')[0] };
+   })`
+);
+ok('CSV 导出(表头/行/截图base64)', csvCheck.len > 2000 && csvCheck.hasB64 && csvCheck.hasApi && /时间,大步骤,类型/.test(csvCheck.head), `长度 ${csvCheck.len}, head=${csvCheck.head.slice(0, 40)}…`);
+
+/* 9. DevTools 面板(以标签页方式打开):时间轴 / 定位 / 选区 */
+const panel = await newPage(`${EXT_BASE}/devtools/panel.html`);
+await waitFor(panel.sessionId, `document.querySelectorAll('#timeline .thumb').length >= 6`, '面板时间轴渲染', 15000);
+await evalJs(panel.sessionId, `document.querySelectorAll('#timeline .thumb')[1].click(); true`);
+await waitFor(panel.sessionId, `document.querySelector('.page-row.hl') !== null`, '点击缩略图定位大步骤');
+ok('DevTools 面板:缩略图点击定位大步骤', true, '');
+
+const picked = await evalJs(
+  panel.sessionId,
+  `(() => {
+     const thumbs = [...document.querySelectorAll('#timeline .thumb')];
+     const i = thumbs.findIndex(t => t.title.includes('/vue.html'));
+     if (i < 0 || i + 1 >= thumbs.length) return false;
+     document.getElementById('rangeMode').click();
+     thumbs[i].click();
+     thumbs[Math.min(i + 2, thumbs.length - 1)].click();
+     return true;
+   })()`
+);
+await sleep(300);
+const rangeReady = await evalJs(panel.sessionId, `document.getElementById('btnSubmitRange').hidden === false`);
+ok('DevTools 面板:时间轴选区(起止两张截图)', picked === true && rangeReady === true, '');
+await evalJs(panel.sessionId, `document.getElementById('btnSubmitRange').click(); true`);
+await sleep(400);
+const rangeStored = await evalJs(panel.sessionId, `chrome.storage.session.get('submitRange').then(v => !!v.submitRange)`);
+ok('选区写入 storage 供提交页使用', rangeStored === true, '');
+
+/* 10. 管理页应用选区范围 */
+await evalJs(manager.sessionId, `location.reload(); true`);
+await sleep(1500);
+await waitFor(manager.sessionId, `window.__bugrecMgrReady === true`, '管理页重载完成');
+const scopeText = await evalJs(manager.sessionId, `document.getElementById('scopeInfo').textContent`);
+ok('管理页应用时间轴选区范围', /时间轴选区/.test(scopeText), scopeText.slice(0, 60));
+const scopedDesc = await evalJs(manager.sessionId, `document.getElementById('bugDescription').value`);
+ok('选区外步骤不进入描述', !scopedDesc.includes('在「用户名」中输入'), '');
 
 console.log('SMOKE_DONE');
 console.log(JSON.stringify(results, null, 2));

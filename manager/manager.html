@@ -52,6 +52,7 @@
           <button id="btnExport" class="ghost">导出 JSON</button>
         </div>
         <div class="meta" id="detailMeta"></div>
+        <div class="meta" id="scopeInfo"></div>
 
         <h3>操作时间线(URL 为大步骤 · 操作/API/Pinia 按时间交错 · 勾选要提交的步骤)</h3>
         <div class="row wrap steps-toolbar">
@@ -87,8 +88,12 @@
           </label>
           <div class="row wrap">
             <label class="chk"><input id="bugAttach" type="checkbox" checked /> 附加每步截图</label>
+            <label>最多附加截图
+              <span class="inline"><input id="bugShotMax" type="number" value="20" min="0" style="width:70px" /> 张(超出取最近)</span>
+            </label>
             <button type="button" id="btnRegen">重新生成描述</button>
             <button type="button" id="btnCopyDesc">复制描述</button>
+            <button type="button" id="btnExportCsv">导出 CSV(含截图base64)</button>
             <button type="submit" id="btnSubmit" class="primary">🚀 提交到 Redmine</button>
           </div>
           <div id="submitResult"></div>
@@ -97,7 +102,12 @@
     </section>
   </main>
 
-  <div id="lightbox" hidden><img id="lightboxImg" alt="截图预览" /></div>
+  <div id="lightbox" hidden>
+    <div class="lightbox-inner">
+      <img id="lightboxImg" alt="截图预览" />
+      <span id="lightboxMarker" class="shot-marker big" hidden></span>
+    </div>
+  </div>
   <script src="manager.js" type="module"></script>
 </body>
 </html>

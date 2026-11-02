@@ -51,6 +51,8 @@
     "open_in_tab": true
   },
 
+  "devtools_page": "devtools/devtools.html",
+
   "permissions": [
     "storage",
     "unlimitedStorage",

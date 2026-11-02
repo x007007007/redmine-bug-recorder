@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="panel.css" />
+</head>
+<body>
+  <header>
+    <span class="dot" id="dot"></span>
+    <span id="recText">未录制</span>
+    <button id="btnToggle" class="primary">● 开始录制</button>
+    <button id="btnOpenMgr" title="打开提交/管理页">🚀 提交</button>
+  </header>
+
+  <div class="range-bar">
+    <label class="chk"><input id="rangeMode" type="checkbox" /> 选范围</label>
+    <span id="rangeInfo">点击下方截图可定位大步骤</span>
+    <button id="btnClearRange" class="ghost" hidden>清除选区</button>
+    <button id="btnSubmitRange" class="primary" hidden>按此范围去提交 →</button>
+  </div>
+
+  <div id="timeline"></div>
+
+  <div class="pages-head">
+    <b>大步骤</b>
+    <span class="pager">
+      <button id="pgPrev">‹</button>
+      <span id="pgInfo">1 / 1</span>
+      <button id="pgNext">›</button>
+    </span>
+  </div>
+  <div id="pages"></div>
+
+  <script src="panel.js" type="module"></script>
+</body>
+</html>

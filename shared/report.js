@@ -2,12 +2,13 @@
 // 描述始终按时间正序排列(复现步骤必须按先后),UI 中的排序/过滤只影响视图。
 
 import { fmtTime, fmtClock, clip, shortUrl, describeAction, describePiniaEvent } from './describe.js';
-import { buildPages, computePropsDiffs, assignShotNames } from './timeline.js';
+import { buildPages, computePropsDiffs } from './timeline.js';
+import { planShotUploads } from './shots.js';
 
 export function buildDescription(session, actions, requests, logs, env = {}, opts = {}) {
-  const { piniaEvents = [], userAgent, lastUrl } = opts;
+  const { piniaEvents = [], userAgent, lastUrl, shotLimit = 0 } = opts;
   const lines = [];
-  const shots = assignShotNames(actions);
+  const shots = new Map(planShotUploads(actions, shotLimit).map((p) => [p.actionId, p.filename]));
   const propsDiffs = computePropsDiffs(actions);
   const pages = buildPages(actions, requests, piniaEvents);
 

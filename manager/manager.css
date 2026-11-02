@@ -192,4 +192,17 @@ h3:first-of-type { margin-top: 14px; }
   display: flex; align-items: center; justify-content: center; z-index: 99; cursor: zoom-out;
 }
 #lightbox[hidden] { display: none; }
-#lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+.lightbox-inner { position: relative; }
+#lightbox img { display: block; max-width: 92vw; max-height: 92vh; border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+
+/* 截图上的半透明点击标记(透明覆盖层,叠在页面上显色) */
+.shot-wrap { position: relative; display: inline-block; }
+.shot-marker {
+  position: absolute; width: 14px; height: 14px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(217, 48, 37, 0.95);
+  background: rgba(217, 48, 37, 0.35);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+.shot-marker.big { width: 30px; height: 30px; border-width: 4px; }

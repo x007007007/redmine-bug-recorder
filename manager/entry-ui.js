@@ -39,10 +39,19 @@ export function buildActionRow(a, opts) {
   if (badges) body.appendChild(badges);
 
   const img = document.createElement('img');
+  let marker = null;
   if (a.screenshot) {
     img.src = a.screenshot;
     img.title = `小步骤 ${num} 截图`;
-    img.addEventListener('click', () => onZoom(a.screenshot));
+    img.addEventListener('click', () => onZoom(a));
+    // 半透明点击标记覆盖层(按视口比例定位)
+    if (a.point && a.viewport) {
+      marker = document.createElement('span');
+      marker.className = 'shot-marker';
+      marker.style.left = (a.point.x / a.viewport.w) * 100 + '%';
+      marker.style.top = (a.point.y / a.viewport.h) * 100 + '%';
+      marker.title = `点击位置 (${a.point.x}, ${a.point.y})`;
+    }
   } else {
     img.className = 'none';
     img.alt = '';
@@ -55,6 +64,12 @@ export function buildActionRow(a, opts) {
   del.addEventListener('click', () => onDelete(a));
 
   row.append(cb, time, body, img, del);
+  if (marker) {
+    const wrap = document.createElement('span');
+    wrap.className = 'shot-wrap';
+    row.replaceChild(wrap, img);
+    wrap.append(img, marker);
+  }
   return row;
 }
 
