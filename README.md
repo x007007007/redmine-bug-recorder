@@ -24,21 +24,36 @@
 
 ## 安装
 
+源码为 TypeScript,浏览器加载的是构建产物 `dist/`:
+
+```bash
+npm install
+npm run build   # = tsc strict 类型检查 + esbuild 打包到 dist/
+```
+
 ### Chrome(正式浏览器)
 
 1. 打开 `chrome://extensions`,右上角开启「开发者模式」
-2. 「加载已解压的扩展程序」选择本目录(`redmine-bug-recorder/`)
+2. 「加载已解压的扩展程序」选择 **`dist/`** 目录
 3. ⚠️ 注意:品牌版 Chrome 137+ 命令行 `--load-extension` 已失效,但「加载已解压」不受影响
 
 ### Firefox
 
 ```bash
-# 临时加载(重启失效,适合试用)
-web-ext run --source-dir . --config-discovery
-# 或 about:debugging#/runtime/this-firefox → 临时载入附加组件 → 选 manifest.firefox.json
+npm run build
+# about:debugging#/runtime/this-firefox → 临时载入附加组件 → 选 dist/manifest.firefox.json
+# 或打 zip 后从文件安装:npm run zip → dist 同级生成 bug-recorder-extension.zip
 ```
 
 Firefox 用 `manifest.firefox.json`(无 `chrome.debugger`,响应体/Console 不捕获;需 Firefox 128+,`world: MAIN` 支持从此版本开始)。正式分发需在 addons.mozilla.org 签名。
+
+### 开发
+
+```bash
+npm run watch      # 增量构建(改 TS 后刷新扩展即生效)
+npm run typecheck  # 仅类型检查(tsc strict)
+npm run smoke      # 端到端冒烟(40 项断言,需先 build 并启动 demo 两个服务 + CfT 浏览器)
+```
 
 ## 配置 Redmine
 
@@ -86,38 +101,27 @@ DevTools 面板的时间轴:每步截图按时间排列,点击缩略图定位到
 
 ## 项目结构
 
-约定:所有 JS 模块 ≤ 200 行左右,便于维护。
+约定:所有模块 ≤ 200 行左右;源码为 TypeScript(strict),`npm run build` 经 tsc 检查 + esbuild 打包到 `dist/`(content 脚本打包为 IIFE 经典脚本,background/页面为 ESM,共享模块内联)。
 
 ```
 manifest.json            Chrome MV3(background 双写 service_worker+scripts,Firefox 也能载)
 manifest.firefox.json    Firefox MV3 变体
-background/
-  service-worker.js      入口(注册各模块监听器)
-  state.js               录制状态 / 设置 / 徽章 / 通知
-  net-capture.js         webRequest 捕获(元数据+请求体)
-  net-cdp.js             chrome.debugger 捕获(响应体+Console,仅 Chrome)
-  recorder.js            开始/停止、操作与 Pinia 事件入库、截图管线(防拍错标签页)
-  sessions.js            会话查询 / 删除(会话级与条目级)
-  redmine-submit.js      连接测试 / 下拉数据 / 提交 issue
-  router.js              消息路由
-content/
-  dom-meta.js            (隔离世界)选择器 / 字段标签工具
-  recorder.js            (隔离世界)事件录制 + 主世界探针桥
-  probe-serialize.js     (主世界)安全序列化
-  vue-probe.js           (主世界)Vue 组件/props/Pinia 捕获
-shared/
-  describe.js            可读文案与时间格式
-  timeline.js            统一时间线:页面分组 / 归属 / 排序 / 搜索 / props diff
-  report.js              Redmine 描述生成(页面内操作与 API 交错)
-  db.js                  IndexedDB(sessions/actions/requests/logs/pinia)
-  redmine.js             Redmine REST API 客户端
-popup/                   弹窗(开始/停止/入口)
+build.mjs                esbuild 构建脚本(7 个入口 → dist/,--watch 增量)
+shared/                  types.ts(数据模型/消息映射)+ describe / timeline / report /
+                         db(IndexedDB)/ redmine(REST 客户端)/ shots(截图限量计划)
+background/              state(状态/设置)/ net-capture(webRequest)/ net-cdp(debugger)/
+                         recorder(编排/截图管线)/ sessions(查询/删除)/
+                         redmine-submit(提交/烙点击标记)/ router(消息路由)/ service-worker(入口)
+content/                 dom-meta(选择器/标签)+ recorder(事件录制,入口)/
+                         probe-serialize(安全序列化)+ vue-probe(组件/props/Pinia,入口)
+popup/                   弹窗
 manager/                 管理页模块:store / dom / api / settings-ui / sessions-ui /
                          entry-ui / page-ui / steps-ui / report-ui / range / export-csv
-devtools/                DevTools 面板(devtools.js 注册 + panel 时间轴/分页/选区)
+devtools/                DevTools 面板(devtools.ts 注册 + panel/panel-pages 时间轴/分页/选区)
 demo/                    本地演示:普通页 + Vue3+Pinia 页 + 假 Redmine
-tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,40 项断言)
+tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,40 项断言,加载 dist/)
 tools/gen_icons.py       图标生成
+dist/                    构建产物(浏览器实际加载的目录,gitignore)
 ```
 
 ## 本地联调 / 测试
@@ -127,15 +131,16 @@ tools/gen_icons.py       图标生成
 python3 demo/server.py          # 演示应用 http://127.0.0.1:8123(登录 demo/demo123)
 python3 demo/server.py redmine  # 假 Redmine http://127.0.0.1:8124
 
-# 端到端冒烟(需 Node ≥ 21;默认用本机 Playwright 缓存的 Chrome for Testing)
+# 端到端冒烟(需 Node ≥ 21;加载 dist/,默认用本机 Playwright 缓存的 Chrome for Testing)
 CFT="$HOME/Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
 "$CFT" --headless=new --remote-debugging-port=9223 --user-data-dir=/tmp/bugrec-profile \
-  --no-first-run "--disable-extensions-except=$PWD" "--load-extension=$PWD" about:blank &
+  --no-first-run "--disable-extensions-except=$PWD/dist" "--load-extension=$PWD/dist" about:blank &
 sleep 4
 node tools/cdp_smoke.mjs 9223 bkeogdmbgodhopooimgmbacldmdmpeap "$PWD"
 ```
 
-最近一次全量结果:**28/28 PASS**(含 Vue 组件名、props diff、Pinia 事件、步骤勾选联动、11 张截图上传)。
+最近一次全量结果:**40/40 PASS**(TS 构建产物;含 Vue 组件名、props diff、Pinia 事件、步骤勾选/删除、
+排序/搜索/折叠、截图限量、PNG 点击标记、CSV 下载、DevTools 面板定位/选区、提交 Redmine 全链路)。
 
 ## 隐私与安全
 

@@ -421,16 +421,28 @@ ok(
   `project=${lastIssue.issue.project_id}, 描述 ${lastIssue.issue.description.length} 字符, 附件 ${lastIssue.issue.uploads?.length || 0} 个`
 );
 
-/* 8.5 CSV 导出 */
-const csvCheck = await evalJs(
-  manager.sessionId,
-  `Promise.all([import('./export-csv.js'), chrome.runtime.sendMessage({type:'LIST_SESSIONS'})]).then(async ([m, ss]) => {
-     const data = await chrome.runtime.sendMessage({type:'GET_SESSION', id: ss[0].id});
-     const csv = m.buildCsv(data);
-     return { len: csv.length, hasB64: /A[A-Za-z0-9+\\/]{80,}/.test(csv), hasApi: csv.includes('API'), head: csv.split('\\r\\n')[0] };
-   })`
-);
-ok('CSV 导出(表头/行/截图base64)', csvCheck.len > 2000 && csvCheck.hasB64 && csvCheck.hasApi && /时间,大步骤,类型/.test(csvCheck.head), `长度 ${csvCheck.len}, head=${csvCheck.head.slice(0, 40)}…`);
+/* 8.5 CSV 导出(点击按钮走真实下载,经 CDP 拦截下载文件) */
+const dlDir = '/tmp/bugrec-dl';
+fs.rmSync(dlDir, { recursive: true, force: true });
+fs.mkdirSync(dlDir, { recursive: true });
+await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: dlDir });
+await evalJs(manager.sessionId, `document.getElementById('btnExportCsv').click(); true`);
+let csvPath = null;
+for (let i = 0; i < 40 && !csvPath; i++) {
+  await sleep(250);
+  const f = (fs.existsSync(dlDir) ? fs.readdirSync(dlDir) : []).find((x) => x.endsWith('.csv'));
+  if (f) csvPath = path.join(dlDir, f);
+}
+ok('CSV 导出触发下载', !!csvPath, dlDir);
+if (csvPath) {
+  const csv = fs.readFileSync(csvPath, 'utf8');
+  const head = csv.split('\r\n')[0] || '';
+  ok(
+    'CSV 内容(表头/行/截图base64)',
+    csv.length > 2000 && /时间,大步骤,类型/.test(head) && /A[A-Za-z0-9+/]{80,}/.test(csv) && csv.includes('API'),
+    `长度 ${csv.length}`
+  );
+}
 
 /* 9. DevTools 面板(以标签页方式打开):时间轴 / 定位 / 选区 */
 const panel = await newPage(`${EXT_BASE}/devtools/panel.html`);
