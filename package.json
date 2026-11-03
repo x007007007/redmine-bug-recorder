@@ -10,6 +10,7 @@
     "build:fast": "node build.mjs",
     "watch": "node build.mjs --watch",
     "release": "npm run typecheck && node tools/make-release.mjs",
+    "source-zip": "node tools/make-source-package.mjs",
     "smoke": "node tools/cdp_smoke.mjs 9223 bkeogdmbgodhopooimgmbacldmdmpeap \"$PWD\""
   },
   "devDependencies": {
