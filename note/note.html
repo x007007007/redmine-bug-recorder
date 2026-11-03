@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>记录修改意见</title>
+  <style>
+    :root { --accent: #d93025; --muted: #5f6368; --text: #202124; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font: 13px/1.5 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text); background: #fff; padding: 14px 16px;
+    }
+    h1 { font-size: 15px; margin-bottom: 8px; }
+    .loc { margin: 0 0 8px; color: #3c4043; font-size: 12px; word-break: break-all; }
+    .loc b { color: var(--muted); font-weight: 600; }
+    textarea {
+      width: 100%; min-height: 96px; border: 1px solid #dadce0; border-radius: 8px;
+      padding: 8px; font: inherit; resize: vertical;
+    }
+    .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+    button { border: 1px solid #dadce0; background: #fff; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .hint { color: var(--accent); font-size: 12px; min-height: 1.2em; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>记录修改意见</h1>
+  <p class="loc" id="pageLine"><b>页面</b> <span id="pageText">—</span></p>
+  <p class="loc" id="elLine"><b>元素</b> <span id="elText">—</span></p>
+  <p class="loc"><b>Vue</b> <span id="vueText">—</span></p>
+  <p class="loc"><b>props</b> <span id="propsText">—</span></p>
+  <textarea id="opinion" placeholder="要改成什么"></textarea>
+  <div class="hint" id="hint"></div>
+  <div class="row">
+    <button type="button" id="btnCancel">取消</button>
+    <button type="button" class="primary" id="btnSave">保存</button>
+  </div>
+  <script src="note.js" type="module"></script>
+</body>
+</html>

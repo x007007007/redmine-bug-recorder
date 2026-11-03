@@ -20,8 +20,24 @@ const COMMON = {
   legalComments: 'none',
 };
 
+function firefoxCdpStub() {
+  const stub = path.join(root, 'background/net-cdp-firefox.ts');
+  return {
+    name: 'firefox-cdp-stub',
+    setup(buildApi) {
+      buildApi.onResolve({ filter: /(?:^|\/)net-cdp$/ }, () => ({ path: stub }));
+    },
+  };
+}
+
 const entries = [
   { in: 'background/service-worker.ts', out: 'background/service-worker.js', format: 'esm' },
+  {
+    in: 'background/service-worker.ts',
+    out: 'background/service-worker.firefox.js',
+    format: 'esm',
+    plugins: [firefoxCdpStub()],
+  },
   { in: 'content/console-hook.ts', out: 'content/console-hook.js', format: 'iife' },
   { in: 'content/recorder.ts', out: 'content/recorder.js', format: 'iife' },
   { in: 'content/vue-probe.ts', out: 'content/vue-probe.js', format: 'iife' },
@@ -29,6 +45,7 @@ const entries = [
   { in: 'manager/manager.ts', out: 'manager/manager.js', format: 'esm' },
   { in: 'devtools/devtools.ts', out: 'devtools/devtools.js', format: 'iife' },
   { in: 'devtools/panel.ts', out: 'devtools/panel.js', format: 'iife' },
+  { in: 'note/note.ts', out: 'note/note.js', format: 'esm' },
 ];
 
 async function copyStatic() {
@@ -40,7 +57,7 @@ async function copyStatic() {
   }
   await cp(path.join(root, 'icons'), path.join(dist, 'icons'), { recursive: true });
   // 各页面的 html/css 原样拷贝
-  for (const dir of ['popup', 'manager', 'devtools']) {
+  for (const dir of ['popup', 'manager', 'devtools', 'note']) {
     await mkdir(path.join(dist, dir), { recursive: true });
     for (const f of await readdir(path.join(root, dir))) {
       if (f.endsWith('.html') || f.endsWith('.css')) {
@@ -60,6 +77,7 @@ if (watch) {
         entryPoints: [path.join(root, e.in)],
         outfile: path.join(dist, e.out),
         format: e.format,
+        plugins: e.plugins,
         watch: true,
       })
     )
@@ -76,6 +94,7 @@ if (watch) {
       entryPoints: [path.join(root, e.in)],
       outfile: path.join(dist, e.out),
       format: e.format,
+      plugins: e.plugins,
     });
   }
   console.log('build done → dist/');

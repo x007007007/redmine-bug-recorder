@@ -40,10 +40,15 @@ async function stage(stageDir, target) {
   await rm(stageDir, { recursive: true, force: true });
   await cp(dist, stageDir, { recursive: true });
   await rm(path.join(stageDir, 'manifest.firefox.json'), { force: true });
+  const firefoxSw = path.join(stageDir, 'background/service-worker.firefox.js');
   if (target === 'firefox') {
     await rm(path.join(stageDir, 'manifest.json'));
     await cp(path.join(root, 'manifest.firefox.json'), path.join(stageDir, 'manifest.json'));
+    assert.ok(existsSync(firefoxSw), '缺少 Firefox 后台脚本,请先 npm run build');
+    await cp(firefoxSw, path.join(stageDir, 'background/service-worker.js'));
   }
+  await rm(firefoxSw, { force: true });
+  await rm(firefoxSw + '.map', { force: true });
 }
 
 const chromeStage = path.join(root, '.release-chrome-stage');

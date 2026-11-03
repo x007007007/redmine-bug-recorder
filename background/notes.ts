@@ -1,8 +1,9 @@
 // 右键菜单「记录修改意见」,以及把意见写入当前录制会话。
 
 import { dbAdd } from '../shared/db';
+import { NOTE_DRAFT_KEY } from '../shared/types';
 import { state, notifySessionUpdated } from './state';
-import type { ChangeNote } from '../shared/types';
+import type { ChangeNote, NoteDraft } from '../shared/types';
 
 const MENU_ID = 'bugrec-note';
 
@@ -27,13 +28,31 @@ export function installNotes(): void {
 function onMenu(info: chrome.contextMenus.OnClickData, tab?: chrome.tabs.Tab): void {
   if (info.menuItemId !== MENU_ID || !tab || tab.id == null) return;
   const frameId = typeof info.frameId === 'number' ? info.frameId : undefined;
-  const msg = { type: 'OPEN_NOTE', isRecording: state.recording };
+  const msg = { type: 'TAKE_NOTE_DRAFT' };
+  let pending: Promise<{ draft?: NoteDraft | null } | undefined>;
   try {
-    const p = chrome.tabs.sendMessage(tab.id, msg, frameId == null ? {} : { frameId });
-    if (p && typeof p.catch === 'function') p.catch(() => {});
+    pending = chrome.tabs.sendMessage(tab.id, msg, frameId == null ? {} : { frameId });
   } catch {
-    /* 该帧还没有内容脚本 */
+    return;
   }
+  void Promise.resolve(pending)
+    .then((res) => {
+      if (!res || !res.draft) return;
+      return openNoteWindow(res.draft);
+    })
+    .catch(() => {});
+}
+
+async function openNoteWindow(draft: NoteDraft): Promise<void> {
+  await chrome.storage.session.set({ [NOTE_DRAFT_KEY]: draft });
+  const url = chrome.runtime.getURL('note/note.html');
+  const tabs = await chrome.tabs.query({ url });
+  const windowId = tabs[0] ? tabs[0].windowId : undefined;
+  if (windowId != null) {
+    await chrome.windows.update(windowId, { focused: true });
+    return;
+  }
+  await chrome.windows.create({ url, type: 'popup', width: 460, height: 520 });
 }
 
 export async function onRecNote(note: Partial<ChangeNote>): Promise<{ recorded: boolean }> {

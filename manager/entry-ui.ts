@@ -1,7 +1,7 @@
 // 时间线条目行构建:操作行(勾选/截图+点击标记/删除)、API 行(可展开请求/响应体)、Pinia 行。
 
 import { fmtClock, describeAction, describeElement, describeLog, describePiniaEvent } from '../shared/describe';
-import { esc, shortenUrl } from './dom';
+import { shortenUrl } from './dom';
 import type { ChangeNote, LogEntry, RecordedAction, PiniaEvent, RequestEntry } from '../shared/types';
 
 export interface ActionRowOpts {
@@ -40,13 +40,21 @@ export function buildActionRow(a: RecordedAction, opts: ActionRowOpts): HTMLDivE
   what.textContent = `${num ? num + '. ' : ''}${describeAction(a)}`;
   body.appendChild(what);
 
-  const bits: string[] = [];
-  if (a.selector) bits.push(`<code>${esc(a.selector)}</code>`);
-  if (a.kind === 'click' && a.href) bits.push(`→ ${esc(a.href)}`);
-  if (a.value) bits.push(`值: ${esc(String(a.value).slice(0, 120))}`);
   const sub = document.createElement('div');
   sub.className = 'sub';
-  sub.innerHTML = bits.join(' · ') || '&nbsp;';
+  const chunks: Node[] = [];
+  if (a.selector) {
+    const code = document.createElement('code');
+    code.textContent = a.selector;
+    chunks.push(code);
+  }
+  if (a.kind === 'click' && a.href) chunks.push(document.createTextNode(`→ ${a.href}`));
+  if (a.value) chunks.push(document.createTextNode(`值: ${String(a.value).slice(0, 120)}`));
+  if (!chunks.length) sub.textContent = '\u00a0';
+  chunks.forEach((node, index) => {
+    if (index > 0) sub.appendChild(document.createTextNode(' · '));
+    sub.appendChild(node);
+  });
   body.appendChild(sub);
 
   const badges = buildBadges(a, opts.propsDiff);

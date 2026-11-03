@@ -2,7 +2,7 @@
 
 import { send } from '../manager/api';
 import { bindCaptureToggles } from '../manager/capture-ui';
-import { $, esc, showError, showVersion } from '../manager/dom';
+import { $, showError, showVersion } from '../manager/dom';
 import { fmtTime } from '../shared/describe';
 import type { SessionSummary, StateInfo } from '../shared/types';
 
@@ -47,10 +47,19 @@ function renderSessionList(sessions: SessionSummary[], activeId: string | null):
     const row = document.createElement('div');
     row.className = 'session-item';
     const status = { recording: '录制中', stopped: '已停止', submitted: '已提交' }[s.status] || s.status;
-    row.innerHTML =
-      `<b>${esc(fmtTime(s.startedAt).slice(5))}</b> ` +
-      (s.id === activeId ? '<span class="live">● LIVE</span> ' : '') +
-      `<span class="m">${status} · ${s.actionCount}步 · ${s.requestCount}API${s.logCount ? ` · ${s.logCount}Console` : ''}</span>`;
+    const when = document.createElement('b');
+    when.textContent = fmtTime(s.startedAt).slice(5);
+    const meta = document.createElement('span');
+    meta.className = 'm';
+    meta.textContent = `${status} · ${s.actionCount}步 · ${s.requestCount}API${s.logCount ? ` · ${s.logCount}Console` : ''}`;
+    row.append(when, document.createTextNode(' '));
+    if (s.id === activeId) {
+      const live = document.createElement('span');
+      live.className = 'live';
+      live.textContent = '● LIVE';
+      row.append(live, document.createTextNode(' '));
+    }
+    row.append(meta);
     row.addEventListener('click', () => {
       void chrome.tabs.create({ url: chrome.runtime.getURL('manager/manager.html') });
       window.close();

@@ -2,7 +2,6 @@
 // 纯构建逻辑,交互回调由 steps-ui 通过 handlers 注入,避免模块循环。
 
 import { entryVisible, type CaptureView, type ListOrigin } from '../shared/timeline';
-import { esc } from './dom';
 import { buildActionRow, buildRequestRow, buildLogRow, buildNoteRow, buildPiniaRow } from './entry-ui';
 import type { PageGroup, RecordedAction } from '../shared/types';
 
@@ -97,10 +96,20 @@ function buildHead(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTMLDivElement 
   const logCount = p.entries.filter((e) => e.type === 'log').length;
   const navShot = p.actions.find((a) => a.kind === 'navigate');
   const shot = navShot ? ctx.shots.get(navShot.id) : null;
-  title.innerHTML =
-    `📄 <b>大步骤 ${p.orderIndex}</b> · ${esc(p.url)}` +
-    (p.title ? ` <span class="count">(${esc(p.title)})</span>` : '') +
-    ` <span class="count">· ${clock}${tab} · ${counts} 步 / ${apiCount} API${logCount ? ` / ${logCount} Console` : ''}${shot ? ' · 整页截图 ✓' : ''}</span>`;
+  title.append(document.createTextNode('📄 '));
+  const heading = document.createElement('b');
+  heading.textContent = `大步骤 ${p.orderIndex}`;
+  title.append(heading, document.createTextNode(` · ${p.url}`));
+  if (p.title) {
+    const name = document.createElement('span');
+    name.className = 'count';
+    name.textContent = `(${p.title})`;
+    title.append(document.createTextNode(' '), name);
+  }
+  const meta = document.createElement('span');
+  meta.className = 'count';
+  meta.textContent = `· ${clock}${tab} · ${counts} 步 / ${apiCount} API${logCount ? ` / ${logCount} Console` : ''}${shot ? ' · 整页截图 ✓' : ''}`;
+  title.append(document.createTextNode(' '), meta);
   head.appendChild(title);
 
   const delPage = document.createElement('button');

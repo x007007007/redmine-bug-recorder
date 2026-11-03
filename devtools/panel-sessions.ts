@@ -1,6 +1,5 @@
 // 面板 · 会话列表:切换查看 / 删除历史会话。
 
-import { esc } from '../manager/dom';
 import { fmtTime } from '../shared/describe';
 import type { SessionSummary } from '../shared/types';
 
@@ -35,10 +34,19 @@ function buildItem(s: SessionSummary, opts: SessionListOpts): HTMLDivElement {
   main.className = 'si-main';
   const statusText =
     { recording: '录制中', stopped: '已停止', submitted: `已提交#${s.issueId || ''}` }[s.status] || s.status;
-  main.innerHTML =
-    `<b>${esc(fmtTime(s.startedAt).slice(5))}</b>` +
-    (s.id === opts.activeId ? ' <span class="live">● LIVE</span>' : '') +
-    `<span class="m"> ${statusText} · ${s.actionCount}步/${s.requestCount}API${s.logCount ? `/${s.logCount}Console` : ''}</span>`;
+  const when = document.createElement('b');
+  when.textContent = fmtTime(s.startedAt).slice(5);
+  const meta = document.createElement('span');
+  meta.className = 'm';
+  meta.textContent = ` ${statusText} · ${s.actionCount}步/${s.requestCount}API${s.logCount ? `/${s.logCount}Console` : ''}`;
+  main.append(when);
+  if (s.id === opts.activeId) {
+    const live = document.createElement('span');
+    live.className = 'live';
+    live.textContent = '● LIVE';
+    main.append(document.createTextNode(' '), live);
+  }
+  main.append(meta);
   main.title = '点击切换到该会话';
   main.addEventListener('click', () => opts.onSelect(s.id));
 

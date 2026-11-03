@@ -55,7 +55,7 @@ npm run build
 # 或打 zip 后从文件安装:npm run zip → dist 同级生成 bug-recorder-extension.zip
 ```
 
-Firefox 用 `manifest.firefox.json`(无 `chrome.debugger`,响应体/Console 不捕获;需 Firefox 128+,`world: MAIN` 支持从此版本开始)。正式分发需在 addons.mozilla.org 签名。
+Firefox 用 `manifest.firefox.json`(无 `chrome.debugger`,响应体不捕获,Console 由页面挂钩记录;需 Firefox 142+,以便使用内置数据采集同意)。正式分发需在 addons.mozilla.org 签名。
 
 ### 开发
 

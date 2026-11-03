@@ -1,7 +1,7 @@
 // 大步骤分页列表渲染(供 panel.ts 调用)。
 
 import { entryVisible, type CaptureView, type ListOrigin } from '../shared/timeline';
-import { esc, shortenUrl } from '../manager/dom';
+import { shortenUrl } from '../manager/dom';
 import { describeAction, describeElement, describeLog, describePiniaEvent } from '../shared/describe';
 import type { PageGroup } from '../shared/types';
 
@@ -69,9 +69,13 @@ function buildRow(p: PageGroup, opts: PageRenderOpts): PageRow {
   const logCount = p.entries.filter((e) => e.type === 'log').length;
   const title = document.createElement('span');
   title.className = 'titles';
-  title.innerHTML =
-    `<span class="u">📄 大步骤 ${p.orderIndex} · ${esc(shortenUrl(p.url, 70))}</span>` +
-    `<span class="m">${clock} · ${p.actions.length} 步 / ${apiCount} API${logCount ? ` / ${logCount} Console` : ''} · 已选 ${selCount}/${real.length} · 点击展开明细</span>`;
+  const url = document.createElement('span');
+  url.className = 'u';
+  url.textContent = `📄 大步骤 ${p.orderIndex} · ${shortenUrl(p.url, 70)}`;
+  const meta = document.createElement('span');
+  meta.className = 'm';
+  meta.textContent = `${clock} · ${p.actions.length} 步 / ${apiCount} API${logCount ? ` / ${logCount} Console` : ''} · 已选 ${selCount}/${real.length} · 点击展开明细`;
+  title.append(url, meta);
   title.addEventListener('click', () => row.classList.toggle('open'));
   head.appendChild(title);
   row.appendChild(head);

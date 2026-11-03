@@ -70,9 +70,18 @@ export function renderScopeBanner(): void {
     el.textContent = '';
     return;
   }
-  el.innerHTML =
-    `⚠️ 当前生效范围:<b>${store.scope.label}</b> · ` +
-    `<a href="#" id="lnkFull">查看全部</a> · <a href="#" id="lnkDefault">恢复默认范围</a>`;
+  el.textContent = '';
+  const label = document.createElement('b');
+  label.textContent = store.scope.label;
+  const full = document.createElement('a');
+  full.href = '#';
+  full.id = 'lnkFull';
+  full.textContent = '查看全部';
+  const reset = document.createElement('a');
+  reset.href = '#';
+  reset.id = 'lnkDefault';
+  reset.textContent = '恢复默认范围';
+  el.append(document.createTextNode('⚠️ 当前生效范围:'), label, document.createTextNode(' · '), full, document.createTextNode(' · '), reset);
   document.getElementById('lnkFull')!.addEventListener('click', async (e) => {
     e.preventDefault();
     store.fullScope = true;

@@ -1,13 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Bug Recorder for Redmine",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "测试助手:记录 UI 操作步骤(每步自动截图)与 API 交互,一键提交 Bug 到 Redmine。",
 
   "browser_specific_settings": {
     "gecko": {
       "id": "bug-recorder@x007007007",
-      "strict_min_version": "128.0"
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["authenticationInfo", "browsingActivity", "websiteActivity", "websiteContent"]
+      }
     }
   },
 

@@ -102,6 +102,18 @@ export interface ChangeNote {
   opinion: string;
 }
 
+/** 右键点中元素后、写意见之前的定位信息。表单在扩展自己的窗口里，不插入被测页面。 */
+export interface NoteDraft {
+  url: string;
+  title: string;
+  selector: string;
+  label: string;
+  htmlHint: string;
+  vue: VueInfo | null;
+}
+
+export const NOTE_DRAFT_KEY = 'bugrec.noteDraft';
+
 export type SessionStatus = 'recording' | 'stopped' | 'submitted';
 
 /** 一次成功提交到 Redmine 的 issue 链接 */

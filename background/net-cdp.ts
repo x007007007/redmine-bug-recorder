@@ -1,12 +1,14 @@
 // CDP 捕获(chrome.debugger,仅 Chrome):XHR/Fetch 响应体 + Console 错误/警告。
 
 import { shouldRecordRequest } from '../shared/capture';
-import { dbAdd, dbCountByIndex } from '../shared/db';
+import { dbAdd } from '../shared/db';
 import { state, mem, getSettings, notifySessionUpdated } from './state';
-import type { LogEntry, RequestEntry } from '../shared/types';
+import type { RequestEntry } from '../shared/types';
+import { recordPageConsole } from './page-console';
+
+export { recordPageConsole };
 
 const MAX_RESPONSE_BODY = 8 * 1024;
-const MAX_LOGS_PER_SESSION = 300;
 const TEXTUAL_CT_RE = /json|text|xml|javascript|urlencoded|form|html/i;
 
 function needsDebugger(captureBodies: boolean): boolean {
@@ -191,30 +193,6 @@ async function finalizeCdpRequest(tabId: number, cdpRequestId: string, e: Reques
   }
   if (!mem.capture.isRequestEnabled) return;
   dbAdd('requests', e).catch(() => {});
-  notifySessionUpdated();
-}
-
-const PAGE_LEVEL: Record<string, LogEntry['level']> = {
-  log: 'log',
-  info: 'info',
-  warning: 'warning',
-  error: 'error',
-};
-
-/** 页面主世界挂钩送来的 console.log/info/warn/error 与未捕获异常 */
-export function recordPageConsole(level: string, text: string): { recorded: boolean } {
-  if (!state.recording || !mem.capture.isConsoleEnabled || !state.sessionId) return { recorded: false };
-  const mapped = PAGE_LEVEL[level];
-  if (!mapped || !text) return { recorded: false };
-  void addLog(state.sessionId, mapped, text);
-  return { recorded: true };
-}
-
-async function addLog(sessionId: string | null, level: LogEntry['level'], text: string): Promise<void> {
-  if (!sessionId) return;
-  const count = await dbCountByIndex('logs', 'bySession', sessionId);
-  if (count >= MAX_LOGS_PER_SESSION) return;
-  await dbAdd<LogEntry>('logs', { sessionId, ts: Date.now(), level, text: text.slice(0, 500) }).catch(() => {});
   notifySessionUpdated();
 }
 
