@@ -97,25 +97,32 @@ jobs:
           notes="安装包由 GitHub Actions 构建。不可商用，商业使用需先联系作者取得书面授权。"
           if [ "$GITHUB_REF" = "refs/heads/main" ]; then
             rel="${{ steps.version_tag.outputs.tag }}"
-            target="${{ steps.version_tag.outputs.target }}"
             # 分支名不是版本号。清掉曾经误建的 main Release / tag，避免和 vX.Y.Z 并列。
             gh release delete main --yes --cleanup-tag > /tmp/gh-delete-main.txt 2>&1 || true
           else
             rel="$GITHUB_REF_NAME"
-            target="$GITHUB_SHA"
           fi
           test -n "$rel"
-          test -n "$target"
+          # tag 已在上一步或本次 ref 上存在。用 API 建 Release，避免 gh 在浅克隆里再建一次 tag。
           gh release delete "$rel" --yes > /tmp/gh-delete.txt 2>&1 || true
-          if ! gh release create "$rel" release/* \
-            --target "$target" \
-            --title "$rel" \
-            --notes "$notes" \
-            --latest > /tmp/gh-create.txt 2>&1; then
+          if ! gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
+            -f tag_name="$rel" \
+            -f name="$rel" \
+            -f body="$notes" \
+            -F make_latest=true > /tmp/gh-create.txt 2>&1; then
             {
-              echo '## gh release create 失败'
+              echo '## 创建 Release 失败'
               echo '```'
               cat /tmp/gh-delete.txt /tmp/gh-create.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if ! gh release upload "$rel" release/* --clobber >> /tmp/gh-create.txt 2>&1; then
+            {
+              echo '## 上传安装包失败'
+              echo '```'
+              cat /tmp/gh-create.txt
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
