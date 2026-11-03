@@ -9,6 +9,7 @@ import { buildSubject, fmtTime } from '../shared/describe';
 import type { IssueLink, RecorderSession } from '../shared/types';
 import { selectedActions } from './steps-ui';
 import { buildCsv } from './export-csv';
+import { t } from '../shared/i18n';
 
 const DOCK_KEY = 'bugrec.submitDock';
 
@@ -78,10 +79,10 @@ export function regenerateDescription(): void {
 async function onCopy(): Promise<void> {
   try {
     await navigator.clipboard.writeText(($('bugDescription') as HTMLTextAreaElement).value);
-    $('btnCopyDesc').textContent = '已复制 ✓';
-    window.setTimeout(() => ($('btnCopyDesc').textContent = '复制描述'), 2000);
+    $('btnCopyDesc').textContent = t('btnCopied');
+    window.setTimeout(() => ($('btnCopyDesc').textContent = t('btnCopy')), 2000);
   } catch {
-    showError(new Error('复制失败,请手动全选复制'));
+    showError(new Error(t('copyFailed')));
   }
 }
 
@@ -90,13 +91,13 @@ async function onSubmit(e: Event): Promise<void> {
   if (!store.cache) return;
   const projectId = ($('bugProjectManual') as HTMLInputElement).value.trim() || ($('bugProject') as HTMLSelectElement).value;
   if (!updatingIssueId && !projectId) {
-    showError(new Error('请先载入并选择项目,或在"手动填项目标识"中填写(Redmine 项目页 URL 中的标识或数字 ID)'));
+    showError(new Error(t('needProject')));
     return;
   }
   const btn = $('btnSubmit') as HTMLButtonElement;
   const isUpdate = updatingIssueId != null;
   btn.disabled = true;
-  btn.textContent = isUpdate ? '更新中…' : '提交中…';
+  btn.textContent = isUpdate ? t('updating') : t('submitting');
   $('submitResult').textContent = '';
   try {
     const res = await send({
@@ -121,8 +122,8 @@ async function onSubmit(e: Event): Promise<void> {
       if (store.full && store.full.session.id === store.cache.session.id) store.full.session.submissions = res.submissions;
       renderIssueLinks(store.cache.session);
     }
-    const verb = isUpdate ? `已更新 #${res.issueId}` : '已创建';
-    $('submitResult').textContent = res.uploadCount ? `${verb},含 ${res.uploadCount} 个附件` : verb;
+    const verb = isUpdate ? t('updatedIssue', String(res.issueId)) : t('created');
+    $('submitResult').textContent = res.uploadCount ? t('withAttachments', [verb, String(res.uploadCount)]) : verb;
     const { refreshSessions } = await import('./sessions-ui');
     void refreshSessions();
   } catch (err) {
@@ -151,7 +152,7 @@ export function renderIssueLinks(session: RecorderSession): void {
   box.textContent = '';
   const links = issueLinksOf(session);
   const rail = $('btnDockExpand');
-  rail.textContent = links.length ? `提交 Bug · ${links.length}` : '提交 Bug';
+  rail.textContent = links.length ? t('submitBugCount', String(links.length)) : t('submitBug');
   if (!links.length) {
     box.hidden = true;
     return;
@@ -159,7 +160,7 @@ export function renderIssueLinks(session: RecorderSession): void {
   box.hidden = false;
   const title = document.createElement('div');
   title.className = 'issue-links-title';
-  title.textContent = `历史提交 ${links.length} 条`;
+  title.textContent = t('historyTitle', String(links.length));
   const list = document.createElement('ul');
   for (const link of [...links].reverse()) {
     list.appendChild(buildHistoryItem(link));
@@ -176,11 +177,11 @@ function buildHistoryItem(link: IssueLink): HTMLLIElement {
   const subject = link.subject ? ` ${link.subject.slice(0, 42)}` : '';
   anchor.textContent = `#${link.issueId}${subject}`;
   const time = document.createElement('time');
-  const revised = (link.revisionCount || 1) > 1 ? ` · 更新过 ${link.revisionCount} 次` : '';
+  const revised = (link.revisionCount || 1) > 1 ? t('revised', String(link.revisionCount)) : '';
   time.textContent = `${fmtTime(link.submittedAt)}${revised}`;
   const update = document.createElement('button');
   update.type = 'button';
-  update.textContent = updatingIssueId === link.issueId ? '正在更新' : '更新这条';
+  update.textContent = updatingIssueId === link.issueId ? t('updatingThis') : t('updateThis');
   update.addEventListener('click', () => {
     setUpdateTarget(link.issueId);
     setDockCollapsed(false);
@@ -197,7 +198,7 @@ function setUpdateTarget(issueId: number | null): void {
     hint.textContent = '';
   } else {
     hint.hidden = false;
-    hint.textContent = `正在更新 #${issueId}:会修改这条工单的主题和描述,并追加附件,不会新建 issue。`;
+    hint.textContent = t('updateHint', String(issueId));
   }
   paintSubmitButton();
   if (store.cache) renderIssueLinks(store.cache.session);
@@ -206,7 +207,7 @@ function setUpdateTarget(issueId: number | null): void {
 function paintSubmitButton(): void {
   const btn = $('btnSubmit') as HTMLButtonElement;
   if (btn.disabled) return;
-  btn.textContent = updatingIssueId ? `更新 #${updatingIssueId}` : '🚀 提交到 Redmine';
+  btn.textContent = updatingIssueId ? t('updateButton', String(updatingIssueId)) : t('btnSubmit');
 }
 
 function readDock(): DockPref {

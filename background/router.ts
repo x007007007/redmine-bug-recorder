@@ -1,6 +1,7 @@
 // 消息路由:popup / 管理页 → 后台各模块的唯一入口。
 // 统一约定:handler 返回值即响应;抛错则响应 { error }。
 
+import { t } from '../shared/i18n';
 import type { CaptureFlags } from '../shared/capture';
 import type { ChangeNote, RecorderSettings } from '../shared/types';
 import { getSettings, state, mem, saveCapture, currentState, whenCaptureReady, rememberRedmineBase } from './state';
@@ -58,7 +59,7 @@ export function installRouter(): void {
   chrome.runtime.onMessage.addListener((msg: Msg, sender, sendResponse) => {
     const handler = HANDLERS[msg && msg.type];
     if (!handler) {
-      sendResponse({ error: `未知消息类型: ${msg && msg.type}` });
+      sendResponse({ error: t('errUnknown', String(msg && msg.type)) });
       return true;
     }
     Promise.resolve()

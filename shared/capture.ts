@@ -21,13 +21,13 @@ export const DEFAULT_CAPTURE: CaptureFlags = {
   isRequestPageOnly: true,
 };
 
-export const CAPTURE_TOGGLES: { key: keyof CaptureFlags; label: string; title: string }[] = [
-  { key: 'isClickEnabled', label: '点击', title: '记录点击事件' },
-  { key: 'isScreenshotEnabled', label: '截图', title: '操作后截取可视区域' },
-  { key: 'isKeyboardEnabled', label: '键盘', title: '记录键盘输入与回车' },
-  { key: 'isVueEnabled', label: 'Vue', title: '记录组件状态与 Pinia' },
-  { key: 'isConsoleEnabled', label: 'Console', title: '记录 console.log / info / warn / error 和未捕获异常' },
-  { key: 'isRequestEnabled', label: '请求', title: '记录 XHR / Fetch。范围见旁边的「当前页 / 全局」' },
+export const CAPTURE_TOGGLES: { key: keyof CaptureFlags; labelKey: string; titleKey: string }[] = [
+  { key: 'isClickEnabled', labelKey: 'capClick', titleKey: 'capClickTitle' },
+  { key: 'isScreenshotEnabled', labelKey: 'capShot', titleKey: 'capShotTitle' },
+  { key: 'isKeyboardEnabled', labelKey: 'capKey', titleKey: 'capKeyTitle' },
+  { key: 'isVueEnabled', labelKey: 'capVue', titleKey: 'capVueTitle' },
+  { key: 'isConsoleEnabled', labelKey: 'capConsole', titleKey: 'capConsoleTitle' },
+  { key: 'isRequestEnabled', labelKey: 'capRequest', titleKey: 'capRequestTitle' },
 ];
 
 export interface RequestOrigin {

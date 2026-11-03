@@ -1,14 +1,28 @@
 // 导出 CSV(Excel 可直接打开):操作 / API / Pinia 按时间交错,截图列含 base64 编码。
 
 import { fmtClock, describeAction, describeElement, describeLog, describePiniaEvent, shortUrl, clip } from '../shared/describe';
+import { t } from '../shared/i18n';
 import { buildPages } from '../shared/timeline';
 import type { PageGroup, SessionDetail, TimelineEntry } from '../shared/types';
 
-const HEADERS = ['时间', '大步骤', '类型', '内容', 'Vue组件', '选择器', '值/请求体', '状态/耗时', '页面', '截图base64'];
+function headers(): string[] {
+  return [
+    t('csvTime'),
+    t('csvStepCol'),
+    t('csvType'),
+    t('csvContent'),
+    t('csvVue'),
+    t('csvSelector'),
+    t('csvValue'),
+    t('csvStatus'),
+    t('csvPage'),
+    t('csvShot'),
+  ];
+}
 
 export function buildCsv(cache: SessionDetail): string {
   const pages = buildPages(cache.actions, cache.requests, cache.pinia, cache.logs, cache.notes || []);
-  const lines: string[][] = [HEADERS];
+  const lines: string[][] = [headers()];
   for (const p of pages) {
     const stepNumMap = stepNumbers(p);
     for (const e of p.entries) {
@@ -31,14 +45,14 @@ function stepNumbers(p: PageGroup): Map<number, number> {
 
 function csvRow(p: PageGroup, e: TimelineEntry, numOf: Map<number, number>): string[] {
   const ts = fmtClock(e.ts);
-  const page = p.pseudo ? '(前置)' : `#${p.orderIndex} ${shortUrl(p.url, 60)}`;
-  const stepCol = e.type === 'action' && numOf.has(e.data.id!) ? `步骤${numOf.get(e.data.id!)}` : '';
+  const page = p.pseudo ? t('csvBefore') : `#${p.orderIndex} ${shortUrl(p.url, 60)}`;
+  const stepCol = e.type === 'action' && numOf.has(e.data.id!) ? t('csvStep', String(numOf.get(e.data.id!))) : '';
   if (e.type === 'action') {
     const a = e.data;
     return [
       ts,
       stepCol,
-      '操作',
+      t('csvAction'),
       describeAction(a),
       (a.vue && a.vue.component) || '',
       a.selector || '',
@@ -58,13 +72,13 @@ function csvRow(p: PageGroup, e: TimelineEntry, numOf: Map<number, number>): str
       '',
       '',
       clip(String(r.requestBody || ''), 500),
-      r.error ? `错误:${r.error}` : `${r.status || '?'}${r.durationMs != null ? ' / ' + r.durationMs + 'ms' : ''}`,
+      r.error ? t('csvError', r.error) : `${r.status || '?'}${r.durationMs != null ? ' / ' + r.durationMs + 'ms' : ''}`,
       page,
       '',
     ];
   }
   if (e.type === 'log') return [ts, '', 'Console', describeLog(e.data), '', '', '', e.data.level, page, ''];
-  if (e.type === 'note') return [ts, '', '修改意见', `${describeElement(e.data)} → ${e.data.opinion}`, '', e.data.selector, e.data.opinion, '', page, ''];
+  if (e.type === 'note') return [ts, '', t('csvNote'), `${describeElement(e.data)} → ${e.data.opinion}`, '', e.data.selector, e.data.opinion, '', page, ''];
   return [ts, '', 'Pinia', describePiniaEvent(e.data), '', '', '', '', page, ''];
 }
 

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html>
 <head>
   <meta charset="utf-8" />
   <title>Bug Recorder for Redmine</title>
@@ -8,28 +8,28 @@
 <body data-dock-side="right" data-dock-collapsed="1">
   <header>
     <h1>🐞 Bug Recorder <small>for Redmine</small> <span id="extVer"></span></h1>
-    <span class="chip" id="recChip"><span class="dot" id="dot"></span><span id="recText">未录制</span></span>
-    <button id="btnToggleRec" class="primary">● 开始录制</button>
+    <span class="chip" id="recChip"><span class="dot" id="dot"></span><span id="recText">__MSG_stateIdle__</span></span>
+    <button id="btnToggleRec" class="primary">__MSG_btnStart__</button>
     <div id="captureBar" class="capture-bar"></div>
     <span id="err" class="err" hidden></span>
   </header>
 
   <details id="settingsBox">
-    <summary>⚙️ 设置(Redmine 连接与捕获选项)</summary>
+    <summary>__MSG_settingsSummary__</summary>
     <div class="settings-grid">
-      <label>Redmine 地址
-        <input id="setUrl" placeholder="https://redmine.example.com（站点根地址，不要带 /projects 或 /issues）" />
+      <label>__MSG_labelUrl__
+        <input id="setUrl" placeholder="__MSG_phUrl__" />
       </label>
-      <label>API Key(我的账号 页面可查看)
-        <input id="setKey" type="password" placeholder="在 Redmine「我的账号」底部获取" />
+      <label>__MSG_labelKey__
+        <input id="setKey" type="password" placeholder="__MSG_phKey__" />
       </label>
       <label class="chk">
         <input id="setBodies" type="checkbox" />
-        捕获 API 响应体(需同时打开上方「请求」;仅 Chrome,浏览器顶部会出现"正在调试"横幅)
+        __MSG_labelBodies__
       </label>
       <div class="row">
-        <button id="btnSaveSettings">保存设置</button>
-        <button id="btnTest">测试连接</button>
+        <button id="btnSaveSettings">__MSG_btnSaveSettings__</button>
+        <button id="btnTest">__MSG_btnTest__</button>
         <span id="testResult"></span>
       </div>
     </div>
@@ -38,46 +38,46 @@
   <main id="workspace">
     <aside id="sessionAside">
       <div class="aside-head">
-        <h2>会话列表</h2>
-        <button id="btnRefresh" class="ghost" title="刷新列表">⟳</button>
+        <h2>__MSG_sessionsHead__</h2>
+        <button id="btnRefresh" class="ghost" title="__MSG_btnRefreshTitle__">⟳</button>
       </div>
       <div id="sessions"></div>
     </aside>
 
     <section id="detail">
-      <div id="noSession" class="empty">选择左侧会话,或点击"开始录制"后去业务页面操作。<br /><br />提示:录制中,每次点击/输入都会自动截图;发现 Bug 后回到本页面提交。</div>
+      <div id="noSession" class="empty">__MSG_emptySession__</div>
 
       <div id="sessionDetail" hidden>
         <div class="detail-head">
-          <h2 id="detailTitle">会话</h2>
-          <button id="btnExport" class="ghost">导出 JSON</button>
+          <h2 id="detailTitle">__MSG_sessionWord__</h2>
+          <button id="btnExport" class="ghost">__MSG_btnExport__</button>
         </div>
         <div class="meta" id="detailMeta"></div>
         <div class="meta" id="scopeInfo"></div>
         <div id="issueHistory" class="issue-history" hidden></div>
 
-        <h3>操作时间线(URL 为大步骤 · 操作/API/Console/Pinia 按时间交错 · 勾选要提交的步骤)</h3>
+        <h3>__MSG_timelineTitle__</h3>
         <div class="row wrap steps-toolbar">
-          <label class="chk"><input id="selAll" type="checkbox" checked /> 全选步骤</label>
+          <label class="chk"><input id="selAll" type="checkbox" checked /> __MSG_selAll__</label>
           <span class="count" id="selInfo"></span>
-          <input id="searchBox" placeholder="搜索过滤大步骤(URL / 标题 / 步骤内容 / API 路径)" />
-          <select id="listOrigin" title="区分人填写的修改意见和自动记录的事件">
-            <option value="all">全部</option>
-            <option value="human">人填写的</option>
-            <option value="event">事件记录</option>
+          <input id="searchBox" placeholder="__MSG_phSearch__" />
+          <select id="listOrigin" title="__MSG_originTitle__">
+            <option value="all">__MSG_originAll__</option>
+            <option value="human">__MSG_originHuman__</option>
+            <option value="event">__MSG_originEvent__</option>
           </select>
-          <select id="sortMode" title="大步骤排序(不改变页面内部顺序)">
-            <option value="desc">最新页面在前</option>
-            <option value="asc">最早页面在前</option>
+          <select id="sortMode" title="__MSG_sortTitle__">
+            <option value="desc">__MSG_sortDesc__</option>
+            <option value="asc">__MSG_sortAsc__</option>
           </select>
-          <button type="button" id="btnCollapseAll" class="ghost">折叠/展开全部</button>
+          <button type="button" id="btnCollapseAll" class="ghost">__MSG_btnCollapse__</button>
           <span class="view-filters" id="viewFilters">
-            <label class="chk"><input type="checkbox" data-view="isClickShown" checked /> 点击</label>
-            <label class="chk"><input type="checkbox" data-view="isKeyboardShown" checked /> 键盘</label>
-            <label class="chk"><input type="checkbox" data-view="isShotShown" checked /> 截图</label>
+            <label class="chk"><input type="checkbox" data-view="isClickShown" checked /> __MSG_filterClick__</label>
+            <label class="chk"><input type="checkbox" data-view="isKeyboardShown" checked /> __MSG_filterKey__</label>
+            <label class="chk"><input type="checkbox" data-view="isShotShown" checked /> __MSG_filterShot__</label>
             <label class="chk"><input type="checkbox" data-view="isVueShown" checked /> Vue</label>
             <label class="chk"><input type="checkbox" data-view="isConsoleShown" checked /> Console</label>
-            <label class="chk"><input type="checkbox" data-view="isRequestShown" checked /> 请求</label>
+            <label class="chk"><input type="checkbox" data-view="isRequestShown" checked /> __MSG_filterRequest__</label>
           </span>
         </div>
         <div id="steps"></div>
@@ -86,47 +86,47 @@
 
     <aside id="submitDock" hidden>
       <div class="dock-rail">
-        <button type="button" id="btnDockExpand" title="展开提交框">提交 Bug</button>
-        <button type="button" id="btnDockSideRail" class="ghost" title="换到另一侧">⇄</button>
+        <button type="button" id="btnDockExpand" title="__MSG_dockExpandTitle__">__MSG_submitBug__</button>
+        <button type="button" id="btnDockSideRail" class="ghost" title="__MSG_dockSideTitle__">⇄</button>
       </div>
       <div class="dock-body">
     <div class="dock-head">
-      <b>提交 Bug</b>
+      <b>__MSG_submitBug__</b>
       <span id="dockSel"></span>
-      <button type="button" id="btnDockSide" class="ghost" title="换到另一侧">⇄</button>
-      <button type="button" id="btnDockCollapse" class="ghost">收起</button>
-      <button type="button" id="btnRegen">按已选步骤生成描述</button>
+      <button type="button" id="btnDockSide" class="ghost" title="__MSG_dockSideTitle__">⇄</button>
+      <button type="button" id="btnDockCollapse" class="ghost">__MSG_dockCollapse__</button>
+      <button type="button" id="btnRegen">__MSG_btnRegen__</button>
     </div>
     <form id="bugForm">
-      <label>主题
-        <input id="bugSubject" required placeholder="一句话描述 Bug" />
+      <label>__MSG_labelSubject__
+        <input id="bugSubject" required placeholder="__MSG_phSubject__" />
       </label>
       <div class="row wrap">
-        <label>项目
-          <span class="inline"><select id="bugProject"></select><button type="button" id="btnLoadProjects" class="ghost">载入</button></span>
+        <label>__MSG_labelProject__
+          <span class="inline"><select id="bugProject"></select><button type="button" id="btnLoadProjects" class="ghost">__MSG_btnLoad__</button></span>
         </label>
-        <label>跟踪
-          <select id="bugTracker"><option value="">(默认)</option></select>
+        <label>__MSG_labelTracker__
+          <select id="bugTracker"><option value="">__MSG_optDefault__</option></select>
         </label>
-        <label>优先级
-          <select id="bugPriority"><option value="">(默认)</option></select>
+        <label>__MSG_labelPriority__
+          <select id="bugPriority"><option value="">__MSG_optDefault__</option></select>
         </label>
-        <label>或手动填项目标识 / ID
-          <input id="bugProjectManual" placeholder="如 my-project 或 12" />
+        <label>__MSG_labelProjectManual__
+          <input id="bugProjectManual" placeholder="__MSG_phProject__" />
         </label>
       </div>
-      <label>描述(按当前勾选的步骤生成,可再编辑)
+      <label>__MSG_labelDescription__
         <textarea id="bugDescription" rows="8" spellcheck="false"></textarea>
       </label>
       <div class="row wrap">
-        <label class="chk"><input id="bugAttach" type="checkbox" checked /> 附加每步截图</label>
-        <label class="chk"><input id="bugAttachCsv" type="checkbox" /> 附加 CSV</label>
-        <label>最多截图
-          <span class="inline"><input id="bugShotMax" type="number" value="20" min="0" style="width:64px" /> 张</span>
+        <label class="chk"><input id="bugAttach" type="checkbox" checked /> __MSG_chkShots__</label>
+        <label class="chk"><input id="bugAttachCsv" type="checkbox" /> __MSG_chkCsv__</label>
+        <label>__MSG_labelShotMax__
+          <span class="inline"><input id="bugShotMax" type="number" value="20" min="0" style="width:64px" /> __MSG_shotUnit__</span>
         </label>
-        <button type="button" id="btnCopyDesc">复制描述</button>
-        <button type="button" id="btnExportCsv">导出 CSV</button>
-        <button type="submit" id="btnSubmit" class="primary">🚀 提交到 Redmine</button>
+        <button type="button" id="btnCopyDesc">__MSG_btnCopy__</button>
+        <button type="button" id="btnExportCsv">__MSG_btnExportCsv__</button>
+        <button type="submit" id="btnSubmit" class="primary">__MSG_btnSubmit__</button>
       </div>
       <div id="updateHint" hidden></div>
       <div id="submitResult"></div>
@@ -137,7 +137,7 @@
 
   <div id="lightbox" hidden>
     <div class="lightbox-inner">
-      <img id="lightboxImg" alt="截图预览" />
+      <img id="lightboxImg" alt="__MSG_shotAlt__" />
       <span id="lightboxMarker" class="shot-marker big" hidden></span>
     </div>
   </div>

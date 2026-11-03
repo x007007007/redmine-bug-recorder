@@ -1,6 +1,6 @@
 {
   "name": "redmine-bug-recorder",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "license": "PolyForm-Noncommercial-1.0.0",
   "private": true,
   "description": "测试助手浏览器插件(Chrome MV3 / Firefox MV3):录制 UI 操作(每步截图)+ API 交互 + Vue/Pinia 状态,勾选 review 后一键提交 Redmine",

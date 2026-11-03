@@ -1,5 +1,6 @@
 // 右键菜单「记录修改意见」,以及把意见写入当前录制会话。
 
+import { t } from '../shared/i18n';
 import { dbAdd } from '../shared/db';
 import { NOTE_DRAFT_KEY } from '../shared/types';
 import { state, notifySessionUpdated } from './state';
@@ -14,7 +15,7 @@ export function installNotes(): void {
     chrome.contextMenus.create(
       {
         id: MENU_ID,
-        title: '记录修改意见',
+        title: t('noteTitle'),
         contexts: ['page', 'selection', 'link', 'image', 'editable', 'video', 'audio'],
         documentUrlPatterns: ['http://*/*', 'https://*/*'],
       },

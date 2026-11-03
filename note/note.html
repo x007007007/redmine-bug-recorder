@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="zh-CN">
+<html>
 <head>
   <meta charset="utf-8" />
-  <title>记录修改意见</title>
+  <title>__MSG_noteTitle__</title>
   <style>
     :root { --accent: #d93025; --muted: #5f6368; --text: #202124; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -24,16 +24,16 @@
   </style>
 </head>
 <body>
-  <h1>记录修改意见</h1>
-  <p class="loc" id="pageLine"><b>页面</b> <span id="pageText">—</span></p>
-  <p class="loc" id="elLine"><b>元素</b> <span id="elText">—</span></p>
+  <h1>__MSG_noteTitle__</h1>
+  <p class="loc" id="pageLine"><b>__MSG_notePage__</b> <span id="pageText">—</span></p>
+  <p class="loc" id="elLine"><b>__MSG_noteElement__</b> <span id="elText">—</span></p>
   <p class="loc"><b>Vue</b> <span id="vueText">—</span></p>
   <p class="loc"><b>props</b> <span id="propsText">—</span></p>
-  <textarea id="opinion" placeholder="要改成什么"></textarea>
+  <textarea id="opinion" placeholder="__MSG_notePlaceholder__"></textarea>
   <div class="hint" id="hint"></div>
   <div class="row">
-    <button type="button" id="btnCancel">取消</button>
-    <button type="button" class="primary" id="btnSave">保存</button>
+    <button type="button" id="btnCancel">__MSG_cancel__</button>
+    <button type="button" class="primary" id="btnSave">__MSG_save__</button>
   </div>
   <script src="note.js" type="module"></script>
 </body>

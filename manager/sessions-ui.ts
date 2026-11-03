@@ -4,6 +4,7 @@ import { send } from './api';
 import { $, esc, showError } from './dom';
 import { store } from './store';
 import { fmtTime } from '../shared/describe';
+import { t } from '../shared/i18n';
 import { renderAll } from './steps-ui';
 import { issueLinksOf, prefillForm } from './report-ui';
 import { readPendingRange, applyScope, renderScopeBanner } from './range';
@@ -18,7 +19,12 @@ export async function refreshSessions(): Promise<void> {
     box.appendChild(buildSessionItem(s));
   }
   if (!(store.sessions as unknown as SessionSummary[]).length) {
-    box.innerHTML = '<div style="padding:16px;color:#80868b;font-size:12px;">暂无会话</div>';
+    const empty = document.createElement('div');
+    empty.style.padding = '16px';
+    empty.style.color = '#80868b';
+    empty.style.fontSize = '12px';
+    empty.textContent = t('sessionsEmpty');
+    box.appendChild(empty);
   }
 }
 
@@ -27,22 +33,28 @@ function buildSessionItem(s: SessionSummary): HTMLDivElement {
   div.className = 'session' + (s.id === store.currentId ? ' sel' : '');
   div.dataset.id = s.id;
 
-  const t = document.createElement('div');
-  t.className = 't';
-  t.textContent = fmtTime(s.startedAt);
+  const when = document.createElement('div');
+  when.className = 't';
+  when.textContent = fmtTime(s.startedAt);
 
   const links = issueLinksOf(s);
   const sub = document.createElement('div');
   sub.className = 's';
   const chip = document.createElement('span');
-  const submittedText = links.length > 1 ? `已提交 ${links.length} 条` : `已提交 #${s.issueId || links[0]?.issueId || ''}`;
-  const statusText = { recording: '录制中', stopped: '已停止', submitted: submittedText }[s.status] || s.status;
+  const issueId = String(s.issueId || links[0]?.issueId || '');
+  const submittedText = links.length > 1 ? t('stateSubmittedCount', String(links.length)) : t('stateSubmittedId', issueId);
+  const statusText = { recording: t('stateRecording'), stopped: t('stateStopped'), submitted: submittedText }[s.status] || s.status;
   chip.className = `status-chip status-${s.status}`;
   chip.textContent = statusText;
   sub.append(
     chip,
     document.createTextNode(
-      ` 步骤 ${s.actionCount} · API ${s.requestCount}${s.logCount ? ` · Console ${s.logCount}` : ''}${s.piniaCount ? ` · Pinia ${s.piniaCount}` : ''}`
+      t('sessionStats', [
+        String(s.actionCount),
+        String(s.requestCount),
+        s.logCount ? t('sessionConsole', String(s.logCount)) : '',
+        s.piniaCount ? t('sessionPinia', String(s.piniaCount)) : '',
+      ])
     )
   );
   const issues = document.createElement('div');
@@ -62,11 +74,11 @@ function buildSessionItem(s: SessionSummary): HTMLDivElement {
   const del = document.createElement('button');
   del.className = 'del';
   del.textContent = '✕';
-  del.title = '删除会话';
+  del.title = t('deleteSessionShort');
   del.addEventListener('click', (e) => {
     e.stopPropagation();
     void (async () => {
-      if (!confirm('确认删除该会话及其所有截图/记录?')) return;
+      if (!confirm(t('confirmDelete'))) return;
       await send({ type: 'DELETE_SESSION', id: s.id });
       if (store.currentId === s.id) {
         store.currentId = null;
@@ -80,7 +92,7 @@ function buildSessionItem(s: SessionSummary): HTMLDivElement {
     })();
   });
 
-  div.append(t, sub);
+  div.append(when, sub);
   if (links.length) div.appendChild(issues);
   div.appendChild(del);
   div.addEventListener('click', () => void selectSession(s.id));

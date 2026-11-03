@@ -1,8 +1,9 @@
 // 大步骤分页列表渲染(供 panel.ts 调用)。
 
+import { t } from '../shared/i18n';
 import { entryVisible, type CaptureView, type ListOrigin } from '../shared/timeline';
 import { shortenUrl } from '../manager/dom';
-import { describeAction, describeElement, describeLog, describePiniaEvent } from '../shared/describe';
+import { describeAction, describeLog, describeNote, describePiniaEvent } from '../shared/describe';
 import type { PageGroup } from '../shared/types';
 
 export const PAGE_SIZE = 5;
@@ -30,7 +31,12 @@ export interface PageRenderOpts {
 export function renderPages(container: HTMLElement, rows: PageGroup[], opts: PageRenderOpts): PageRow[] {
   container.textContent = '';
   if (!rows.length) {
-    container.innerHTML = '<div class="empty" style="color:#5f6368;padding:12px;">当前过滤下没有条目</div>';
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.style.color = '#5f6368';
+    empty.style.padding = '12px';
+    empty.textContent = t('filterEmpty');
+    container.appendChild(empty);
     return [];
   }
   const out: PageRow[] = [];
@@ -59,7 +65,7 @@ function buildRow(p: PageGroup, opts: PageRenderOpts): PageRow {
   cb.checked = real.length > 0 && selCount === real.length;
   cb.indeterminate = selCount > 0 && selCount < real.length;
   cb.disabled = real.length === 0;
-  cb.title = `勾选该页全部步骤(共 ${real.length} 步,当前已选 ${selCount})`;
+  cb.title = t('pageCheckTitle', [String(real.length), String(selCount)]);
   cb.addEventListener('click', (e) => e.stopPropagation());
   cb.addEventListener('change', () => opts.onTogglePage(p, cb.checked));
   head.appendChild(cb);
@@ -71,10 +77,17 @@ function buildRow(p: PageGroup, opts: PageRenderOpts): PageRow {
   title.className = 'titles';
   const url = document.createElement('span');
   url.className = 'u';
-  url.textContent = `📄 大步骤 ${p.orderIndex} · ${shortenUrl(p.url, 70)}`;
+  url.textContent = t('pageHeading', [String(p.orderIndex), shortenUrl(p.url, 70)]);
   const meta = document.createElement('span');
   meta.className = 'm';
-  meta.textContent = `${clock} · ${p.actions.length} 步 / ${apiCount} API${logCount ? ` / ${logCount} Console` : ''} · 已选 ${selCount}/${real.length} · 点击展开明细`;
+  meta.textContent = t('pageMeta', [
+    clock,
+    String(p.actions.length),
+    String(apiCount),
+    logCount ? t('pageConsole', String(logCount)) : '',
+    String(selCount),
+    String(real.length),
+  ]);
   title.append(url, meta);
   title.addEventListener('click', () => row.classList.toggle('open'));
   head.appendChild(title);
@@ -110,7 +123,7 @@ function buildRow(p: PageGroup, opts: PageRenderOpts): PageRow {
           : e.type === 'log'
             ? describeLog(e.data)
             : e.type === 'note'
-              ? `修改意见 ${describeElement(e.data)} → ${e.data.opinion}`
+              ? describeNote(e.data)
               : 'Pinia ' + describePiniaEvent(e.data));
     entries.appendChild(div);
   }

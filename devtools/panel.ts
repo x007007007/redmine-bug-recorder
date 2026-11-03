@@ -1,6 +1,7 @@
 // DevTools「Bug Recorder」面板:会话列表(切换/删除)、时间轴缩略图、大步骤勾选
 //(与提交页经 storage.session 实时同步)、选范围提交。
 
+import { t } from '../shared/i18n';
 import { send } from '../manager/api';
 import { bindCaptureToggles } from '../manager/capture-ui';
 import { $, showVersion } from '../manager/dom';
@@ -95,15 +96,15 @@ async function refreshState(): Promise<void> {
   panelState.activeId = st.sessionId;
   if (!panelState.sessionId) panelState.sessionId = st.sessionId;
   $('dot').classList.toggle('on', st.recording);
-  $('recText').textContent = st.recording ? '录制中' : '未录制';
-  ($('btnToggle') as HTMLButtonElement).textContent = st.recording ? '■ 停止录制' : '● 开始录制';
+  $('recText').textContent = st.recording ? t('stateRecording') : t('stateIdle');
+  ($('btnToggle') as HTMLButtonElement).textContent = st.recording ? t('btnStop') : t('btnStart');
 
   panelState.sessions = (await send({ type: 'LIST_SESSIONS' })) as SessionSummary[];
   const listed = new Set(panelState.sessions.map((s) => s.id));
   if (!panelState.sessionId || !listed.has(panelState.sessionId)) {
     panelState.sessionId = st.sessionId && listed.has(st.sessionId) ? st.sessionId : (panelState.sessions[0]?.id ?? null);
   }
-  $('sessCount').textContent = panelState.sessions.length ? `${panelState.sessions.length} 个` : '暂无';
+  $('sessCount').textContent = panelState.sessions.length ? t('countItems', String(panelState.sessions.length)) : t('noneShort');
   paintSessions();
 
   panelState.cache = panelState.sessionId ? await send({ type: 'GET_SESSION', id: panelState.sessionId }) : null;
@@ -147,10 +148,10 @@ async function deleteSession(id: string): Promise<void> {
     if (panelState.recording && panelState.activeId === id) await send({ type: 'STOP_RECORDING' });
     await send({ type: 'DELETE_SESSION', id });
     if (panelState.sessionId === id) panelState.sessionId = null;
-    $('sessHint').textContent = '已删除';
+    $('sessHint').textContent = t('deleted');
     await refreshState();
   } catch (e) {
-    $('sessHint').textContent = '删除失败: ' + String((e as { message?: string }).message ?? e);
+    $('sessHint').textContent = t('deleteFailed', String((e as { message?: string }).message ?? e));
     paintSessions();
   }
 }
@@ -205,11 +206,11 @@ async function writeSelection(rev: number, sessionId: string, ids: number[]): Pr
 
 async function submitRange(): Promise<void> {
   if (!panelState.range) {
-    $('rangeInfo').textContent = '请先点击起点与终点两张截图';
+    $('rangeInfo').textContent = t('rangeNeedBoth');
     return;
   }
   if (!panelState.sessionId) {
-    $('rangeInfo').textContent = '会话未就绪(尚未开始录制?),无法设置范围';
+    $('rangeInfo').textContent = t('rangeNoSession');
     return;
   }
   const payload: SubmitRange = {
@@ -232,11 +233,11 @@ async function submitRange(): Promise<void> {
         /* 尝试下一个区域 */
       }
     }
-    if (!written) throw new Error('写入后读回为空');
-    $('rangeInfo').textContent = `选区已保存,已打开提交页`;
+    if (!written) throw new Error(t('rangeWriteEmpty'));
+    $('rangeInfo').textContent = t('rangeSaved');
     openManager();
   } catch (e) {
-    $('rangeInfo').textContent = '设置选区失败: ' + ((e as { message?: string }).message ?? e);
+    $('rangeInfo').textContent = t('rangeSaveFailed', String((e as { message?: string }).message ?? e));
   }
 }
 

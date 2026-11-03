@@ -1,6 +1,7 @@
 // Redmine REST API 客户端(API Key 认证)。
 // 文档: https://www.redmine.org/projects/redmine/wiki/Rest_api
 
+import { t } from './i18n';
 import type { RecorderSettings, RedmineUser } from './types';
 
 export class RedmineApiError extends Error {
@@ -64,14 +65,10 @@ function safeUrl(url: string): string {
 }
 
 function failureDetail(status: number, path: string, detail: string, finalUrl: string): string {
-  const where = finalUrl ? `最终响应 ${safeUrl(finalUrl)}。` : '';
-  if (status === 404 && /\/issues\/\d+/.test(path)) {
-    return `${detail} ${where}这个 issue 不存在,或当前账号看不到它。`;
-  }
-  if (status === 404 && path.includes('/issues')) {
-    return `${detail} ${where}项目不存在:请填数字 ID 或项目标识(URL 里的英文),不要填项目显示名;Redmine 地址用站点根路径。`;
-  }
-  if (status === 404) return `${detail} ${where}请确认地址是站点根路径(不要带 /projects 或 /issues),且已启用 REST API。`;
+  const where = finalUrl ? t('errWhere', safeUrl(finalUrl)) : '';
+  if (status === 404 && /\/issues\/\d+/.test(path)) return t('errIssueMissing', [detail, where]);
+  if (status === 404 && path.includes('/issues')) return t('errProjectMissing', [detail, where]);
+  if (status === 404) return t('errNotFound', [detail, where]);
   return `${detail} ${where}`.trim();
 }
 
@@ -97,7 +94,7 @@ async function sendApi(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`无法连接 Redmine(${base}): ${message}`);
+    throw new Error(t('errConnect', [base, message]));
   }
   const text = await res.text();
   let data: unknown = null;
@@ -115,9 +112,9 @@ async function sendApi(
 }
 
 async function apiFetch(settings: Partial<RecorderSettings>, path: string, options: ApiFetchOptions = {}): Promise<unknown> {
-  assert(settings.redmineUrl && settings.apiKey, '请先在"设置"中配置 Redmine 地址与 API Key');
+  assert(settings.redmineUrl && settings.apiKey, t('errNeedSettings'));
   const base = normalizeBase(settings.redmineUrl);
-  assert(/^https?:\/\//i.test(base), 'Redmine 地址需要以 http:// 或 https:// 开头');
+  assert(/^https?:\/\//i.test(base), t('errScheme'));
   const method = (options.method || 'GET').toUpperCase();
   try {
     return await sendApi(base, path, settings.apiKey, options, false, false);
@@ -163,7 +160,7 @@ export async function listProjects(settings: Partial<RecorderSettings>): Promise
   throw new RedmineApiError(
     404,
     'GET /projects.json',
-    `不是接口版本不兼容。Redmine 1.0 至今的项目列表都是 GET /projects.json,版本不对不会返回 404。实际请求的是 ${base}/projects.json ,服务器上没有这个地址。请把设置改成浏览器打开 Redmine 首页的根地址,子路径要保留(例如 http://host/redmine),保存后再载入。`
+    t('errProjects', base)
   );
 }
 
@@ -280,7 +277,7 @@ export async function uploadAttachment(
     throw new RedmineApiError(
       404,
       `POST ${primary}`,
-      '附件接口 /uploads.json 和 /uploads 都返回 404。请把地址改成站点根路径(例如 https://redmine.example.com),并确认管理 → 配置 → API 里已启用 REST。可以先取消附件勾选,只提交文字。'
+      t('errUploads')
     );
   }
 }

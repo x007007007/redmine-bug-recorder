@@ -2,6 +2,7 @@
 // 描述始终按时间正序排列(复现步骤必须按先后),UI 中的排序/过滤只影响视图。
 
 import { fmtTime, fmtClock, clip, shortUrl, describeAction, describeElement, describeLog, describePiniaEvent } from './describe';
+import { t } from './i18n';
 import { buildPages, computePropsDiffs } from './timeline';
 import { planShotUploads } from './shots';
 import type { ChangeNote, LogEntry, PiniaEvent, RecordedAction, RequestEntry, RecorderSession } from './types';
@@ -32,20 +33,21 @@ export function buildDescription(
   const propsDiffs = computePropsDiffs(actions);
   const pages = buildPages(actions, requests, piniaEvents, logs);
 
-  lines.push('## 操作步骤');
+  lines.push(t('reportSteps'));
   lines.push('');
-  if (!actions.length) lines.push('(未记录到操作步骤)');
+  if (!actions.length) lines.push(t('reportNoSteps'));
 
   for (const p of pages) {
     if (p.pseudo) {
-      lines.push(`> 录制开始前的请求/事件 ${p.entries.length} 条,详见时序附录。`);
+      lines.push(t('reportBefore', String(p.entries.length)));
       continue;
     }
     const nav = p.actions.find((a) => a.kind === 'navigate');
     const shot = nav ? shots.get(nav.id) : null;
     const time = fmtClock(p.startTime) + (p.endTime > p.startTime ? ` ~ ${fmtClock(p.endTime)}` : '');
-    lines.push(`### 大步骤 ${p.orderIndex} · 页面 ${p.url}${p.title ? `(${p.title})` : ''} · ${time}`);
-    if (shot) lines.push(`整页截图: ${shot}`);
+    const title = p.title ? t('reportPageTitle', p.title) : '';
+    lines.push(t('reportPage', [String(p.orderIndex), p.url, title, time]));
+    if (shot) lines.push(t('reportFullShot', shot));
     lines.push('');
 
     let stepNo = 0;
@@ -56,11 +58,11 @@ export function buildDescription(
       if (a.kind === 'navigate' && a === nav) return;
       stepNo += 1;
       lines.push(`${stepNo}. ${describeAction(a)}`);
-      if (a.selector) lines.push(`   - 元素: \`${clip(a.selector, 160)}\``);
-      if (a.id != null && shots.has(a.id)) lines.push(`   - 截图: ${shots.get(a.id)}`);
+      if (a.selector) lines.push(t('reportElement', clip(a.selector, 160)));
+      if (a.id != null && shots.has(a.id)) lines.push(t('reportShot', shots.get(a.id) || ''));
       appendVueLines(lines, a, propsDiffs);
       for (const e of p.entries.filter((x) => x.ownerStepIdx === idx && x.type !== 'action')) {
-        lines.push(`   - ↳ ${entryLine(e)}`);
+        lines.push(t('reportChild', entryLine(e)));
         if (e.type === 'request') appendReqBody(lines, e.data);
       }
     });
@@ -68,61 +70,62 @@ export function buildDescription(
   }
 
   lines.push('');
-  lines.push('## 修改意见');
+  lines.push(t('reportNotes'));
   lines.push('');
   appendNotes(lines, notes);
 
   lines.push('');
-  lines.push('## 环境信息');
+  lines.push(t('reportEnv'));
   lines.push('');
-  lines.push(`- 记录时间: ${fmtTime(session.startedAt)}${session.endedAt ? ` ~ ${fmtTime(session.endedAt)}` : ''}`);
+  const ended = session.endedAt ? ` ~ ${fmtTime(session.endedAt)}` : '';
+  lines.push(t('reportTime', fmtTime(session.startedAt) + ended));
   if (userAgent) lines.push(`- User-Agent: ${userAgent}`);
-  if (lastUrl) lines.push(`- 最后页面: ${lastUrl}`);
+  if (lastUrl) lines.push(t('reportLastUrl', lastUrl));
 
   appendConsole(lines, logs);
   lines.push('');
-  lines.push('> 本报告由 Bug Recorder for Redmine 自动生成,操作与 API 按时间线合并,步骤与截图经测试人员勾选确认。');
+  lines.push(t('reportFooter'));
   return lines.join('\n');
 }
 
 function entryLine(e: { type: string; data: unknown }): string {
   if (e.type === 'request') {
     const r = e.data as RequestEntry;
-    const status = r.error ? `错误(${r.error})` : `**${r.status || '?'}**`;
+    const status = r.error ? t('reportReqError', r.error) : `**${r.status || '?'}**`;
     const dur = r.durationMs != null ? ` · ${r.durationMs}ms` : '';
     const flag = !r.error && r.status && r.status >= 400 ? ' ⚠️' : '';
-    return `API \`${r.method} ${shortUrl(r.url)}\` → ${status}${dur}${flag}`;
+    return t('reportApi', [r.method, shortUrl(r.url), status, dur, flag]);
   }
   if (e.type === 'log') return describeLog(e.data as LogEntry);
   return `Pinia: ${describePiniaEvent(e.data as PiniaEvent)}`;
 }
 
 function appendReqBody(lines: string[], r: RequestEntry): void {
-  if (r.requestBody) lines.push(`     - 请求体: \`${clip(r.requestBody, 1024)}\``);
+  if (r.requestBody) lines.push(t('reportReqBody', clip(r.requestBody, 1024)));
   if (r.responseBody !== undefined && r.responseBody !== null) {
-    lines.push(`     - 响应体: \`${clip(r.responseBody, 2048)}\``);
+    lines.push(t('reportResBody', clip(r.responseBody, 2048)));
   }
 }
 
 function appendVueLines(lines: string[], a: RecordedAction, propsDiffs: Map<number | undefined, { changes: string[] }>): void {
   if (!a.vue || !a.vue.component) return;
   const chain = a.vue.chain && a.vue.chain.length > 1 ? `(${a.vue.chain.join(' > ')})` : '';
-  lines.push(`   - Vue 组件: ${a.vue.component}${chain}`);
-  if (a.vue.props) lines.push(`   - 组件 props(点击时): \`${clip(a.vue.props, 600)}\``);
+  lines.push(t('reportVue', [a.vue.component, chain]));
+  if (a.vue.props) lines.push(t('reportProps', clip(a.vue.props, 600)));
   const pd = propsDiffs.get(a.id);
   if (pd && pd.changes.length) {
-    lines.push(`   - props 变化: ${pd.changes.map((c) => clip(c, 120)).join('; ')}`);
+    lines.push(t('reportPropsDiff', pd.changes.map((c) => clip(c, 120)).join('; ')));
   }
   if (a.vue.piniaChanges && a.vue.piniaChanges.length) {
     for (const ch of a.vue.piniaChanges.filter((c) => !c.firstSeen)) {
-      lines.push(`   - Pinia store \`${ch.storeId}\` 状态变化,当前值: \`${clip(ch.state, 600)}\``);
+      lines.push(t('reportPinia', [ch.storeId, clip(ch.state, 600)]));
     }
   }
 }
 
 function appendNotes(lines: string[], notes: ChangeNote[]): void {
   if (!notes.length) {
-    lines.push('(本次没有修改意见)');
+    lines.push(t('reportNoNotes'));
     lines.push('');
     return;
   }
@@ -136,8 +139,8 @@ function appendNotes(lines: string[], notes: ChangeNote[]): void {
     const title = list[0]?.title ? ` (${list[0].title})` : '';
     lines.push(`### ${url}${title}`);
     for (const note of list) {
-      lines.push(`- 元素: ${describeElement(note)}`);
-      lines.push(`  - 改为: ${clip(note.opinion, 400)}`);
+      lines.push(t('reportNoteElement', describeElement(note)));
+      lines.push(t('reportNoteChange', clip(note.opinion, 400)));
     }
     lines.push('');
   }
@@ -147,7 +150,7 @@ function appendConsole(lines: string[], logs: LogEntry[]): void {
   const interesting = (logs || []).filter((l) => l.level === 'error' || l.level === 'warning').slice(-50);
   if (!interesting.length) return;
   lines.push('');
-  lines.push('## Console 错误 / 警告(节选)');
+  lines.push(t('reportConsole'));
   lines.push('');
   for (const l of interesting) lines.push(`- [${l.level}] ${clip(l.text, 300)}`);
 }

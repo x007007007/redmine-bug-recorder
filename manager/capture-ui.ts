@@ -2,6 +2,7 @@
 
 import { send } from './api';
 import { CAPTURE_TOGGLES, normalizeCapture, type CaptureFlags } from '../shared/capture';
+import { t } from '../shared/i18n';
 
 export function bindCaptureToggles(bar: HTMLElement): void {
   if (bar.dataset.bound === '1') return;
@@ -22,17 +23,17 @@ function mountCaptureToggles(bar: HTMLElement): void {
   bar.textContent = '';
   const label = document.createElement('span');
   label.className = 'cap-label';
-  label.textContent = '捕获';
+  label.textContent = t('capLabel');
   bar.appendChild(label);
   for (const item of CAPTURE_TOGGLES) {
     const lab = document.createElement('label');
     lab.className = 'chk';
-    lab.title = item.title;
+    lab.title = t(item.titleKey);
     const input = document.createElement('input');
     input.type = 'checkbox';
     input.dataset.cap = item.key;
     input.checked = true;
-    lab.append(input, document.createTextNode(' ' + item.label));
+    lab.append(input, document.createTextNode(' ' + t(item.labelKey)));
     bar.appendChild(lab);
   }
   bar.appendChild(buildScopeSelect());
@@ -41,17 +42,17 @@ function mountCaptureToggles(bar: HTMLElement): void {
 function buildScopeSelect(): HTMLLabelElement {
   const lab = document.createElement('label');
   lab.className = 'chk';
-  lab.title = '当前页只记录正在看的标签页;全局包含其它标签。发往设置里 Redmine 地址的请求始终不记录。';
+  lab.title = t('capScopeTitle');
   const select = document.createElement('select');
   select.dataset.capScope = '1';
   const page = document.createElement('option');
   page.value = 'page';
-  page.textContent = '当前页';
+  page.textContent = t('capPage');
   const all = document.createElement('option');
   all.value = 'all';
-  all.textContent = '全局';
+  all.textContent = t('capAll');
   select.append(page, all);
-  lab.append(document.createTextNode('范围 '), select);
+  lab.append(document.createTextNode(t('capScope')), select);
   return lab;
 }
 

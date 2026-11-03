@@ -1,5 +1,6 @@
 // DOM / 提示的小工具。
 
+import { t } from '../shared/i18n';
 import { errText } from '../shared/types';
 
 export const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
@@ -19,9 +20,9 @@ export function showError(e: unknown): void {
   const el = $('err');
   el.hidden = false;
   el.textContent = errText(e);
-  const t = window.setTimeout(() => (el.hidden = true), 6000);
+  const timer = window.setTimeout(() => (el.hidden = true), 6000);
   clearTimeout((el as HTMLElement & { __t?: number }).__t);
-  (el as HTMLElement & { __t?: number }).__t = t;
+  (el as HTMLElement & { __t?: number }).__t = timer;
 }
 
 export interface SelectItem {
@@ -29,7 +30,7 @@ export interface SelectItem {
   name: string;
 }
 
-export function fillSelect(sel: HTMLSelectElement, items: SelectItem[], presetId: unknown, emptyLabel = '(默认)'): void {
+export function fillSelect(sel: HTMLSelectElement, items: SelectItem[], presetId: unknown, emptyLabel = t('optDefault')): void {
   const current = sel.value;
   sel.textContent = '';
   const opt0 = document.createElement('option');

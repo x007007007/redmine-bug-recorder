@@ -10,8 +10,9 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["shared/**/*.ts", "content/**/*.ts", "background/**/*.ts", "popup/**/*.ts", "manager/**/*.ts", "devtools/**/*.ts"]
+  "include": ["shared/**/*.ts", "content/**/*.ts", "background/**/*.ts", "popup/**/*.ts", "manager/**/*.ts", "devtools/**/*.ts", "note/**/*.ts"]
 }

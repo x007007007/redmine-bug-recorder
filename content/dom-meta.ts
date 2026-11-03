@@ -1,11 +1,13 @@
 // DOM 元数据工具(隔离世界):选择器生成、字段标签、值截断。
 // 供 recorder.ts 以模块方式引入,构建时内联为单个 IIFE 经典脚本。
 
+import { t } from '../shared/i18n';
+
 const MAX_VALUE = 1000;
 
 export function truncate(s: unknown, n: number = MAX_VALUE): string {
   const str = String(s == null ? '' : s);
-  return str.length > n ? str.slice(0, n) + `…(${str.length}字符)` : str;
+  return str.length > n ? t('truncChars', [str.slice(0, n), String(str.length)]) : str;
 }
 
 export function textOf(el: Element): string {

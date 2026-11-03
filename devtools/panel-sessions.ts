@@ -1,6 +1,7 @@
 // 面板 · 会话列表:切换查看 / 删除历史会话。
 
 import { fmtTime } from '../shared/describe';
+import { t } from '../shared/i18n';
 import type { SessionSummary } from '../shared/types';
 
 export interface SessionListOpts {
@@ -16,7 +17,12 @@ export interface SessionListOpts {
 export function renderSessions(container: HTMLElement, sessions: SessionSummary[], opts: SessionListOpts): void {
   container.textContent = '';
   if (!sessions.length) {
-    container.innerHTML = '<div class="empty" style="color:#5f6368;padding:8px;">暂无会话,点上方「开始录制」</div>';
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.style.color = '#5f6368';
+    empty.style.padding = '8px';
+    empty.textContent = t('sessionsEmptyStart');
+    container.appendChild(empty);
     return;
   }
   for (const s of sessions) {
@@ -33,12 +39,13 @@ function buildItem(s: SessionSummary, opts: SessionListOpts): HTMLDivElement {
   const main = document.createElement('span');
   main.className = 'si-main';
   const statusText =
-    { recording: '录制中', stopped: '已停止', submitted: `已提交#${s.issueId || ''}` }[s.status] || s.status;
+    { recording: t('stateRecording'), stopped: t('stateStopped'), submitted: t('stateSubmittedHash', String(s.issueId || '')) }[s.status] || s.status;
   const when = document.createElement('b');
   when.textContent = fmtTime(s.startedAt).slice(5);
   const meta = document.createElement('span');
   meta.className = 'm';
-  meta.textContent = ` ${statusText} · ${s.actionCount}步/${s.requestCount}API${s.logCount ? `/${s.logCount}Console` : ''}`;
+  const logs = s.logCount ? `/${s.logCount}Console` : '';
+  meta.textContent = t('sessionCompact', [statusText, String(s.actionCount), String(s.requestCount), logs]);
   main.append(when);
   if (s.id === opts.activeId) {
     const live = document.createElement('span');
@@ -47,7 +54,7 @@ function buildItem(s: SessionSummary, opts: SessionListOpts): HTMLDivElement {
     main.append(document.createTextNode(' '), live);
   }
   main.append(meta);
-  main.title = '点击切换到该会话';
+  main.title = t('switchSession');
   main.addEventListener('click', () => opts.onSelect(s.id));
 
   row.append(main, buildDelete(s.id, opts));
@@ -60,7 +67,7 @@ function buildDelete(id: string, opts: SessionListOpts): HTMLElement {
     del.type = 'button';
     del.className = 'si-del';
     del.textContent = '✕';
-    del.title = '删除该会话(含截图/记录)';
+    del.title = t('deleteSession');
     del.addEventListener('click', (ev) => {
       ev.stopPropagation();
       opts.onAskDelete(id);
@@ -72,8 +79,8 @@ function buildDelete(id: string, opts: SessionListOpts): HTMLElement {
   const ok = document.createElement('button');
   ok.type = 'button';
   ok.className = 'si-del-ok';
-  ok.textContent = '删除';
-  ok.title = '确认删除该会话';
+  ok.textContent = t('delete');
+  ok.title = t('confirmDeleteShort');
   ok.addEventListener('click', (ev) => {
     ev.stopPropagation();
     opts.onDelete(id);
@@ -81,7 +88,7 @@ function buildDelete(id: string, opts: SessionListOpts): HTMLElement {
   const cancel = document.createElement('button');
   cancel.type = 'button';
   cancel.className = 'si-del-no';
-  cancel.textContent = '取消';
+  cancel.textContent = t('cancel');
   cancel.addEventListener('click', (ev) => {
     ev.stopPropagation();
     opts.onCancelDelete();

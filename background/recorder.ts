@@ -4,6 +4,7 @@
 import { dbAdd, dbGet, dbPut, dbCountByIndex } from '../shared/db';
 import { state, mem, sleep, persistState, updateBadge, notifySessionUpdated } from './state';
 import { attachDebugger, detachAll } from './net-cdp';
+import { t } from '../shared/i18n';
 import { pageUrl } from '../shared/timeline';
 import type { PiniaEvent, RecordedAction, RecorderSession } from '../shared/types';
 
@@ -15,7 +16,7 @@ export function installRecorder(): void {
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (!state.recording) return;
     if (changeInfo.url && tab && tab.url && /^https?:/.test(tab.url)) {
-      void pushNavigate(tab, changeInfo.url, '跳转到');
+      void pushNavigate(tab, changeInfo.url, t('navJump'));
     }
   });
 }
@@ -43,7 +44,7 @@ export async function startRecording(): Promise<{ ok: boolean; sessionId?: strin
   try {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab && tab.url && /^https?:/.test(tab.url)) {
-      await pushNavigate(tab, tab.url, '开始录制');
+      await pushNavigate(tab, tab.url, t('navStart'));
       void attachDebugger(tab.id ?? null);
     }
   } catch {

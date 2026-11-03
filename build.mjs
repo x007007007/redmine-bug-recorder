@@ -56,6 +56,7 @@ async function copyStatic() {
     await copyFile(path.join(root, f), path.join(dist, f));
   }
   await cp(path.join(root, 'icons'), path.join(dist, 'icons'), { recursive: true });
+  await cp(path.join(root, '_locales'), path.join(dist, '_locales'), { recursive: true });
   // 各页面的 html/css 原样拷贝
   for (const dir of ['popup', 'manager', 'devtools', 'note']) {
     await mkdir(path.join(dist, dir), { recursive: true });

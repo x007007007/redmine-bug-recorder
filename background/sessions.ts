@@ -7,6 +7,7 @@ import {
   dbListByIndex,
   dbCountByIndex,
 } from '../shared/db';
+import { t } from '../shared/i18n';
 import type { ChangeNote, LogEntry, PiniaEvent, RecordedAction, RecorderSession, RequestEntry, SessionDetail, SessionSummary } from '../shared/types';
 
 export async function listSessions(): Promise<SessionSummary[]> {
@@ -27,7 +28,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
 
 export async function getSession(id: string): Promise<SessionDetail> {
   const session = await dbGet<RecorderSession>('sessions', id);
-  if (!session) throw new Error('会话不存在');
+  if (!session) throw new Error(t('errNoSession'));
   const actions = (await dbListByIndex<RecordedAction>('actions', 'bySession', id)).sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
   const requests = (await dbListByIndex<RequestEntry>('requests', 'bySession', id)).sort((a, b) => a.ts - b.ts);
   const logs = (await dbListByIndex<LogEntry>('logs', 'bySession', id)).sort((a, b) => a.ts - b.ts).slice(-100);

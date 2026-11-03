@@ -1,6 +1,7 @@
 // CDP 捕获(chrome.debugger,仅 Chrome):XHR/Fetch 响应体 + Console 错误/警告。
 
 import { shouldRecordRequest } from '../shared/capture';
+import { t } from '../shared/i18n';
 import { dbAdd } from '../shared/db';
 import { state, mem, getSettings, notifySessionUpdated } from './state';
 import type { RequestEntry } from '../shared/types';
@@ -197,5 +198,5 @@ async function finalizeCdpRequest(tabId: number, cdpRequestId: string, e: Reques
 }
 
 function clip(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max) + `…(截断,共${s.length}字符)` : s;
+  return s.length > max ? t('clip', [s.slice(0, max), String(s.length)]) : s;
 }

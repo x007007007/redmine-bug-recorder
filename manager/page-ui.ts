@@ -1,6 +1,7 @@
 // 页面(大步骤)分组 DOM 构建:头部(折叠/全选/标题/整页删除)+ 统一时间线条目。
 // 纯构建逻辑,交互回调由 steps-ui 通过 handlers 注入,避免模块循环。
 
+import { t } from '../shared/i18n';
 import { entryVisible, type CaptureView, type ListOrigin } from '../shared/timeline';
 import { buildActionRow, buildRequestRow, buildLogRow, buildNoteRow, buildPiniaRow } from './entry-ui';
 import type { PageGroup, RecordedAction } from '../shared/types';
@@ -69,7 +70,7 @@ function buildHead(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTMLDivElement 
   const caret = document.createElement('button');
   caret.className = 'caret';
   caret.textContent = h.isCollapsed(p) ? '▸' : '▾';
-  caret.title = '折叠 / 展开';
+  caret.title = t('fold');
   caret.addEventListener('click', () => h.onToggleCollapse(p));
   head.appendChild(caret);
 
@@ -82,7 +83,7 @@ function buildHead(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTMLDivElement 
     cb.checked = selectable.length > 0 && selCount === selectable.length;
     cb.indeterminate = selCount > 0 && selCount < selectable.length;
     cb.disabled = selectable.length === 0;
-    cb.title = `勾选该页步骤(已选 ${selCount}/${selectable.length})`;
+    cb.title = t('pageCheckShort', [String(selCount), String(selectable.length)]);
     cb.addEventListener('change', () => h.onTogglePage(p, cb.checked));
     head.appendChild(cb);
   }
@@ -90,7 +91,7 @@ function buildHead(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTMLDivElement 
   const title = document.createElement('span');
   title.className = 'page-title';
   const clock = `${fmt2(p.startTime)}${p.endTime > p.startTime ? ` ~ ${fmt2(p.endTime)}` : ''}`;
-  const tab = ctx.multiTab && p.tabId != null ? ` · 标签页 ${ctx.tabMap.get(p.tabId) || '?'}` : '';
+  const tab = ctx.multiTab && p.tabId != null ? t('pageTab', String(ctx.tabMap.get(p.tabId) || '?')) : '';
   const counts = p.entries.filter((e) => e.type === 'action').length;
   const apiCount = p.entries.filter((e) => e.type === 'request').length;
   const logCount = p.entries.filter((e) => e.type === 'log').length;
@@ -98,7 +99,7 @@ function buildHead(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTMLDivElement 
   const shot = navShot ? ctx.shots.get(navShot.id) : null;
   title.append(document.createTextNode('📄 '));
   const heading = document.createElement('b');
-  heading.textContent = `大步骤 ${p.orderIndex}`;
+  heading.textContent = t('pageStep', String(p.orderIndex));
   title.append(heading, document.createTextNode(` · ${p.url}`));
   if (p.title) {
     const name = document.createElement('span');
@@ -108,14 +109,21 @@ function buildHead(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTMLDivElement 
   }
   const meta = document.createElement('span');
   meta.className = 'count';
-  meta.textContent = `· ${clock}${tab} · ${counts} 步 / ${apiCount} API${logCount ? ` / ${logCount} Console` : ''}${shot ? ' · 整页截图 ✓' : ''}`;
+  meta.textContent = t('pageCounts', [
+    clock,
+    tab,
+    String(counts),
+    String(apiCount),
+    logCount ? t('pageLogCount', String(logCount)) : '',
+    shot ? t('pageFullShot') : '',
+  ]);
   title.append(document.createTextNode(' '), meta);
   head.appendChild(title);
 
   const delPage = document.createElement('button');
   delPage.className = 'del-btn';
-  delPage.textContent = '🗑 删除整页';
-  delPage.title = '删除该页所有记录(步骤/API/Pinia)';
+  delPage.textContent = t('deletePage');
+  delPage.title = t('deletePageTitle');
   delPage.addEventListener('click', () => h.onDeletePage(p));
   head.appendChild(delPage);
 

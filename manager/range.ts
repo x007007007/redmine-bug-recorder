@@ -4,6 +4,7 @@
 import { store, type ScopeInfo } from './store';
 import { $ } from './dom';
 import { fmtClock } from '../shared/describe';
+import { t } from '../shared/i18n';
 import type { SessionDetail, SubmitRange } from '../shared/types';
 
 export const DEFAULT_MAX_ACTIONS = 100;
@@ -43,11 +44,11 @@ export function applyScope(
   if (range) {
     fromTs = range.fromTs;
     toTs = range.toTs;
-    label = `时间轴选区 ${fmtClock(fromTs)} ~ ${fmtClock(toTs)}`;
+    label = t('scopeRange', [fmtClock(fromTs), fmtClock(toTs)]);
   } else {
     fromTs = full.actions[Math.max(0, full.actions.length - DEFAULT_MAX_ACTIONS)]!.ts;
     toTs = Infinity;
-    label = `默认仅保留最近 ${DEFAULT_MAX_ACTIONS} 步`;
+    label = t('scopeDefault', String(DEFAULT_MAX_ACTIONS));
   }
   const inRange = (ts: number): boolean => ts >= fromTs && ts <= toTs;
   return {
@@ -76,12 +77,12 @@ export function renderScopeBanner(): void {
   const full = document.createElement('a');
   full.href = '#';
   full.id = 'lnkFull';
-  full.textContent = '查看全部';
+  full.textContent = t('viewAll');
   const reset = document.createElement('a');
   reset.href = '#';
   reset.id = 'lnkDefault';
-  reset.textContent = '恢复默认范围';
-  el.append(document.createTextNode('⚠️ 当前生效范围:'), label, document.createTextNode(' · '), full, document.createTextNode(' · '), reset);
+  reset.textContent = t('resetScope');
+  el.append(document.createTextNode(t('scopePrefix')), label, document.createTextNode(' · '), full, document.createTextNode(' · '), reset);
   document.getElementById('lnkFull')!.addEventListener('click', async (e) => {
     e.preventDefault();
     store.fullScope = true;

@@ -3,6 +3,7 @@
 // 「当前页」只记正在看的标签;插件自己的请求和发往已配置 Redmine 的请求一律不记。
 
 import { shouldRecordRequest } from '../shared/capture';
+import { t } from '../shared/i18n';
 import { dbAdd } from '../shared/db';
 import { state, mem, notifySessionUpdated } from './state';
 import { installNetCdp } from './net-cdp';
@@ -104,5 +105,5 @@ function pickHeader(headers: chrome.webRequest.HttpHeader[] | undefined, name: s
 }
 
 function clipBody(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max) + `…(截断,共${s.length}字符)` : s;
+  return s.length > max ? t('clip', [s.slice(0, max), String(s.length)]) : s;
 }

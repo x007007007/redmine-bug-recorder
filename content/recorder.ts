@@ -2,6 +2,7 @@
 // 经 CustomEvent 向主世界探针请求 Vue/Pinia 信息后一并发给后台。
 // 值不脱敏(提交前由测试人员 review),仅做长度截断。构建时打包为单个 IIFE 经典脚本。
 
+import { t } from '../shared/i18n';
 import { drainQueue, readVue } from './bridge';
 import { truncate, textOf, fieldLabel, cssPath } from './dom-meta';
 import { captureFlags, watchCaptureFlags } from './capture-flags';
@@ -101,7 +102,7 @@ function install(): void {
     if (el instanceof HTMLInputElement) {
       if (el.type === 'checkbox' || el.type === 'radio') return { inputType: el.type, value: el.checked ? '选中' : '取消' };
       if (el.type === 'submit' || el.type === 'button' || el.type === 'image') return null;
-      if (el.type === 'file') return { inputType: 'file', value: '[文件]' };
+      if (el.type === 'file') return { inputType: 'file', value: t('fileValue') };
       return { inputType: el.type || 'text', value: truncate(el.value) };
     }
     if (el instanceof HTMLTextAreaElement) return { inputType: 'textarea', value: truncate(el.value) };

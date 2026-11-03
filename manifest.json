@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Bug Recorder for Redmine",
-  "version": "0.2.6",
-  "description": "测试助手:记录 UI 操作步骤(每步自动截图)与 API 交互,一键提交 Bug 到 Redmine。",
+  "name": "__MSG_extName__",
+  "version": "0.2.7",
+  "default_locale": "zh_CN",
+  "description": "__MSG_extDescription__",
 
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq5Tq+ssdJICgIsS4SBQ+YTRgJOufAeMHPJCW0cGfnQUvpFfzCoGWZSZW4TvYdSWt4RRFckDfHsWZomXqQNCvAmSU2BGq2pez7xxqsr/KROq0Njo87Y2RFl/YAxO4IxSTBF3u7KNSxkJu2x71mSh9XM3GH7J6Y5Kuo7lirvDMey7QA5DFHyIuTZLtoWx+DtZx4pdZED43xY6qF45VMM0D18ovbkgirqkxYHNY1wxAx0QrKAX0ihk3tFpMNdvJA973xnouNRYWMXW8T9wxi2gXow7hDVEU6ELWf6eqNgKT83CvPoGFYVvjKk86BEUqnmPpMQFPjoWnJ4PagL7fXn1kTwIDAQAB",
 

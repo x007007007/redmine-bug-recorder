@@ -1,8 +1,9 @@
 // 统一时间线:把 操作步骤 / API 请求 / Pinia / Console 归入"页面(大步骤)"并按时间交错。
 // 页面边界只看地址是否变化。同一次打开里重复的「跳转到同一地址」不另开大步骤。
 
-import type { ChangeNote, LogEntry, PageGroup, PiniaEvent, RecordedAction, RequestEntry, TimelineEntry } from './types';
 import { describeAction } from './describe';
+import { t } from './i18n';
+import type { ChangeNote, LogEntry, PageGroup, PiniaEvent, RecordedAction, RequestEntry, TimelineEntry } from './types';
 
 type PageRaw = {
   url: string;
@@ -49,7 +50,7 @@ export function buildPages(
     cur.actions.push(a);
   }
   if (!pages.length) {
-    pages.push({ url: '(未记录页面)', title: '', actions: [], startTs: 0, pseudo: true });
+    pages.push({ url: t('unrecordedPage'), title: '', actions: [], startTs: 0, pseudo: true });
   }
 
   // 页面时间窗:[startTs_i, startTs_{i+1}),请求/事件按 ts 归属页面
@@ -227,7 +228,7 @@ export function computePropsDiffs(actions: RecordedAction[]): Map<number | undef
     const curObj = parse(vue.props);
     if (prevObj && curObj) {
       for (const k of Object.keys(curObj)) {
-        if (!(k in prevObj)) changes.push(`${k}: (新增) → ${curObj[k]}`);
+        if (!(k in prevObj)) changes.push(`${k}: ${t('added')} → ${curObj[k]}`);
         else if (prevObj[k] !== curObj[k]) changes.push(`${k}: ${prevObj[k]} → ${curObj[k]}`);
       }
     }

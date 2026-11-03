@@ -1,6 +1,7 @@
 // 时间线条目行构建:操作行(勾选/截图+点击标记/删除)、API 行(可展开请求/响应体)、Pinia 行。
 
-import { fmtClock, describeAction, describeElement, describeLog, describePiniaEvent } from '../shared/describe';
+import { fmtClock, describeAction, describeLog, describeNote, describePiniaEvent } from '../shared/describe';
+import { t } from '../shared/i18n';
 import { shortenUrl } from './dom';
 import type { ChangeNote, LogEntry, RecordedAction, PiniaEvent, RequestEntry } from '../shared/types';
 
@@ -49,7 +50,7 @@ export function buildActionRow(a: RecordedAction, opts: ActionRowOpts): HTMLDivE
     chunks.push(code);
   }
   if (a.kind === 'click' && a.href) chunks.push(document.createTextNode(`→ ${a.href}`));
-  if (a.value) chunks.push(document.createTextNode(`值: ${String(a.value).slice(0, 120)}`));
+  if (a.value) chunks.push(document.createTextNode(t('valueLabel', String(a.value).slice(0, 120))));
   if (!chunks.length) sub.textContent = '\u00a0';
   chunks.forEach((node, index) => {
     if (index > 0) sub.appendChild(document.createTextNode(' · '));
@@ -64,7 +65,7 @@ export function buildActionRow(a: RecordedAction, opts: ActionRowOpts): HTMLDivE
   let marker: HTMLSpanElement | null = null;
   if (a.screenshot) {
     img.src = a.screenshot;
-    img.title = `小步骤 ${num} 截图`;
+    img.title = t('shotStep', String(num));
     img.addEventListener('click', () => onZoom(a));
     // 半透明点击标记覆盖层(按视口比例定位)
     if (a.point && a.viewport) {
@@ -72,7 +73,7 @@ export function buildActionRow(a: RecordedAction, opts: ActionRowOpts): HTMLDivE
       marker.className = 'shot-marker';
       marker.style.left = (a.point.x / a.viewport.w) * 100 + '%';
       marker.style.top = (a.point.y / a.viewport.h) * 100 + '%';
-      marker.title = `点击位置 (${a.point.x}, ${a.point.y})`;
+      marker.title = t('clickAt', [String(a.point.x), String(a.point.y)]);
     }
   } else {
     img.className = 'none';
@@ -82,7 +83,7 @@ export function buildActionRow(a: RecordedAction, opts: ActionRowOpts): HTMLDivE
   const del = document.createElement('button');
   del.className = 'del-btn';
   del.textContent = '✕';
-  del.title = '删除该步骤';
+  del.title = t('deleteStep');
   del.addEventListener('click', () => onDelete(a));
 
   row.append(cb, time, body, img, del);
@@ -103,7 +104,7 @@ function buildBadges(a: RecordedAction, propsDiff?: { changes: string[] }): HTML
     const comp = document.createElement('span');
     comp.className = 'badge vue';
     comp.textContent = `Vue: ${a.vue.component}`;
-    comp.title = a.vue.chain && a.vue.chain.length > 1 ? `组件链 (${a.vue.chain.join(' > ')})` : '';
+    comp.title = a.vue.chain && a.vue.chain.length > 1 ? t('vueChain', a.vue.chain.join(' > ')) : '';
     wrap.appendChild(comp);
   }
   if (a.vue.props) {
@@ -111,11 +112,11 @@ function buildBadges(a: RecordedAction, propsDiff?: { changes: string[] }): HTML
     const det = document.createElement('details');
     det.className = 'badge props';
     const s = document.createElement('summary');
-    s.textContent = changes.length ? `props (${changes.length} 处变化)` : 'props';
+    s.textContent = changes.length ? t('propsChanges', String(changes.length)) : 'props';
     det.appendChild(s);
     const pre = document.createElement('div');
     pre.className = 'props-body';
-    pre.textContent = a.vue.props + (changes.length ? `\n\n与上次相比:\n${changes.join('\n')}` : '');
+    pre.textContent = a.vue.props + (changes.length ? t('propsCompared', changes.join('\n')) : '');
     det.appendChild(pre);
     wrap.appendChild(det);
   }
@@ -123,7 +124,7 @@ function buildBadges(a: RecordedAction, propsDiff?: { changes: string[] }): HTML
     const pin = document.createElement('span');
     pin.className = 'badge pinia';
     const changed = a.vue.piniaChanges.filter((c) => !c.firstSeen);
-    pin.textContent = changed.length ? `Pinia ${changed.length} 变化` : 'Pinia 首次 变化';
+    pin.textContent = changed.length ? t('piniaChanges', String(changed.length)) : t('piniaFirst');
     pin.title = a.vue.piniaChanges.map((c) => `${c.storeId}: ${c.state.slice(0, 200)}`).join('\n');
     wrap.appendChild(pin);
   }
@@ -160,12 +161,13 @@ export function buildRequestRow(r: RequestEntry): HTMLDetailsElement {
   sum.append(time, m, u, pill, dur);
 
   const pre1 = document.createElement('pre');
-  pre1.textContent = `请求体:\n${r.requestBody || '(空 / 未捕获)'}`;
+  pre1.textContent = t('reqBody', r.requestBody || t('reqEmpty'));
   const pre2 = document.createElement('pre');
   if (r.responseBody !== undefined) {
-    pre2.textContent = `响应体:\n${r.responseBody === null ? '(非文本内容,不展示)' : r.responseBody || '(空)'}`;
+    const body = r.responseBody === null ? t('resBinary') : r.responseBody || t('resEmpty');
+    pre2.textContent = t('resBody', body);
   } else {
-    pre2.textContent = '响应体:未捕获(需开启"捕获 API 请求/响应体",仅 Chrome)';
+    pre2.textContent = t('resMissing');
   }
   d.append(sum, pre1, pre2);
   return d;
@@ -192,7 +194,7 @@ export function buildNoteRow(note: ChangeNote): HTMLDivElement {
   time.textContent = fmtClock(note.ts);
   const line = document.createElement('span');
   line.className = 'note-line';
-  line.textContent = `修改意见 ${describeElement(note)} → ${note.opinion}`;
+  line.textContent = describeNote(note);
   row.append(time, line);
   return row;
 }

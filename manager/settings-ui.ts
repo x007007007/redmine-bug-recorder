@@ -3,6 +3,7 @@
 import { send } from './api';
 import { $, showError, fillSelect } from './dom';
 import { store } from './store';
+import { t } from '../shared/i18n';
 import type { RecorderSettings, RedmineUser } from '../shared/types';
 
 export async function loadSettings(): Promise<void> {
@@ -31,7 +32,7 @@ async function onSave(): Promise<void> {
   store.settings = readSettingsInput();
   try {
     await send({ type: 'SETTINGS_SET', settings: store.settings });
-    $('testResult').textContent = '✅ 已保存';
+    $('testResult').textContent = t('saved');
     window.setTimeout(() => ($('testResult').textContent = ''), 3000);
   } catch (e) {
     showError(e);
@@ -39,14 +40,14 @@ async function onSave(): Promise<void> {
 }
 
 async function onTest(): Promise<void> {
-  $('testResult').textContent = '连接中…';
+  $('testResult').textContent = t('connecting');
   try {
     const tmp: RecorderSettings = {
       redmineUrl: ($('setUrl') as HTMLInputElement).value.trim(),
       apiKey: ($('setKey') as HTMLInputElement).value.trim(),
     };
     const info: RedmineUser = await send({ type: 'TEST_REDMINE', settings: tmp });
-    $('testResult').textContent = `✅ 连接成功:${info.login} (${info.name})`;
+    $('testResult').textContent = t('connected', [info.login, info.name]);
   } catch (e) {
     $('testResult').textContent = '';
     showError(e);
@@ -67,14 +68,8 @@ export async function loadTrackersAndPriorities(): Promise<void> {
 export async function loadProjects(): Promise<void> {
   try {
     const projects = await send({ type: 'LIST_PROJECTS' });
-    fillSelect($('bugProject') as HTMLSelectElement, projects, store.settings.projectId, '(请选择项目)');
-    if (!projects.length) {
-      showError(
-        new Error(
-          '项目列表为空:接口是通的(不是 404)。Redmine 只返回该账号可见的项目。请确认该账号至少是一个项目的成员;也可在下方手动填项目标识或数字 ID。'
-        )
-      );
-    }
+    fillSelect($('bugProject') as HTMLSelectElement, projects, store.settings.projectId, t('optPickProject'));
+    if (!projects.length) showError(new Error(t('projectsEmpty')));
   } catch (e) {
     showError(e);
   }

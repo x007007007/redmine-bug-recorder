@@ -1,6 +1,8 @@
 # Bug Recorder for Redmine
 
-测试助手浏览器插件(Chrome MV3 / Firefox MV3):录制 UI 测试操作过程,每步自动截图,捕获 API 交互与 Vue/Pinia 状态,勾选 review 后一键提交 Bug 到 Redmine。
+测试助手浏览器插件(Chrome MV3 / Firefox MV3):录制 UI 测试操作过程,每步自动截图,捕获 API 交互与 Vue/Pinia 状态,勾选 review 后一键提交 Bug 到 Redmine。界面和生成的报告跟随浏览器语言,现有简体中文与 English。商店简介的中英文本在 [store/LISTING.md](store/LISTING.md)。
+
+A browser extension (Chrome MV3 / Firefox MV3) for testers: it records UI steps with a screenshot on each step, captures API calls and Vue/Pinia state, and files the reviewed bug in Redmine. The interface and the generated report follow the browser language (Simplified Chinese and English). Store listing copy is in [store/LISTING.md](store/LISTING.md).
 
 许可:[PolyForm Noncommercial 1.0.0](LICENSE)(SPDX: `PolyForm-Noncommercial-1.0.0`)。非商业目的可以复制、修改和分发;商业使用须先邮件联系作者取得书面授权:`x007007007@hotmail.com`。再分发时保留本许可,以及 [NOTICE](NOTICE) 中的 `Required Notice` 行。
 

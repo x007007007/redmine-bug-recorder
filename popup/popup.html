@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html>
 <head>
   <meta charset="utf-8" />
   <style>
@@ -35,15 +35,15 @@
 </head>
 <body>
   <h1>🐞 Bug Recorder <span id="extVer"></span></h1>
-  <div id="status"><span class="dot" id="dot"></span><span id="stateText">未录制</span></div>
+  <div id="status"><span class="dot" id="dot"></span><span id="stateText">__MSG_stateIdle__</span></div>
   <div id="stats">—</div>
-  <button id="btnToggle">● 开始录制</button>
+  <button id="btnToggle">__MSG_btnStart__</button>
   <div id="captureBar" class="capture-bar"></div>
-  <div class="sessions-head"><b>会话列表</b></div>
-  <div id="sessionList"><div class="empty">正在加载会话列表…</div></div>
-  <button id="btnManager">打开管理页(提交 Bug / 设置)</button>
+  <div class="sessions-head"><b>__MSG_sessionsHead__</b></div>
+  <div id="sessionList"><div class="empty">__MSG_sessionsLoading__</div></div>
+  <button id="btnManager">__MSG_btnManager__</button>
   <div class="err" id="err" hidden></div>
-  <div class="hint">录制旁边的开关可随时关闭点击、截图、键盘、Vue、Console 或请求。请求范围默认「当前页」,可改成「全局」。发往已配置 Redmine 地址的请求不会被记录。</div>
+  <div class="hint">__MSG_popupHint__</div>
   <script src="popup.js" type="module"></script>
 </body>
 </html>

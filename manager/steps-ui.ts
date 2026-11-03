@@ -13,6 +13,7 @@ import {
   type CaptureView,
 } from '../shared/timeline';
 import { planShotUploads } from '../shared/shots';
+import { t } from '../shared/i18n';
 import { buildPageGroup } from './page-ui';
 import { regenerateDescription } from './report-ui';
 import { persistSelection, adoptSelection, selectionKey } from './selection';
@@ -96,7 +97,10 @@ export function renderAll(): void {
   };
   const pages = buildPagesFiltered();
   if (!pages.length) {
-    box.innerHTML = '<div class="empty">当前过滤下没有条目</div>';
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = t('filterEmpty');
+    box.appendChild(empty);
   }
   for (const p of pages) {
     box.appendChild(buildPageGroup(p, ctx, handlers));
@@ -116,18 +120,16 @@ function syncSelAll(): void {
 }
 
 function updateSelInfo(): void {
-  const text = store.cache
-    ? `已选 ${store.selected.size} / ${store.cache.actions.length} 步(未选步骤不会进入描述与截图附件)`
-    : '';
+  const text = store.cache ? t('selInfo', [String(store.selected.size), String(store.cache.actions.length)]) : '';
   $('selInfo').textContent = text;
   const dock = document.getElementById('dockSel');
-  if (dock) dock.textContent = store.cache ? `已选 ${store.selected.size} 步` : '';
+  if (dock) dock.textContent = store.cache ? t('selDock', String(store.selected.size)) : '';
 }
 
 /* ---------- 删除 ---------- */
 
 async function deleteAction(a: RecordedAction): Promise<void> {
-  if (!confirm('删除该步骤?(仅影响当前会话记录)')) return;
+  if (!confirm(t('confirmDeleteStep'))) return;
   try {
     await send({ type: 'DELETE_ITEMS', sessionId: store.currentId, actionIds: [a.id!] });
     if (store.cache) store.cache.actions = store.cache.actions.filter((x) => x.id !== a.id);
@@ -142,7 +144,7 @@ async function deleteAction(a: RecordedAction): Promise<void> {
 }
 
 async function deletePage(p: PageGroup): Promise<void> {
-  if (!confirm(`删除「${p.url}」整页记录?(含该页 ${p.entries.length} 条步骤/请求/事件)`)) return;
+  if (!confirm(t('confirmDeletePage', [p.url, String(p.entries.length)]))) return;
   try {
     const reqEntries = p.entries.filter((e) => e.type === 'request') as { data: RequestEntry }[];
     const pinEntries = p.entries.filter((e) => e.type === 'pinia') as { data: PiniaEvent }[];

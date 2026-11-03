@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html>
 <head>
   <meta charset="utf-8" />
   <link rel="stylesheet" href="panel.css" />
@@ -8,45 +8,45 @@
   <div class="top">
     <header>
       <span class="dot" id="dot"></span>
-      <span id="recText">未录制</span>
+      <span id="recText">__MSG_stateIdle__</span>
       <span id="extVer"></span>
-      <button id="btnToggle" class="primary">● 开始录制</button>
-      <button id="btnOpenMgr" title="打开提交/管理页">🚀 提交</button>
+      <button id="btnToggle" class="primary">__MSG_btnStart__</button>
+      <button id="btnOpenMgr" title="__MSG_panelSubmitTitle__">__MSG_panelSubmit__</button>
       <div id="captureBar" class="capture-bar"></div>
     </header>
 
-    <div class="sessions-head"><b>会话列表</b><span class="m" id="sessCount">加载中…</span><span class="m" id="sessHint">点击切换 · ✕ 删除</span></div>
-    <div id="sessionList"><div class="empty">正在加载会话列表…</div></div>
+    <div class="sessions-head"><b>__MSG_sessionsHead__</b><span class="m" id="sessCount">__MSG_loading__</span><span class="m" id="sessHint">__MSG_sessHint__</span></div>
+    <div id="sessionList"><div class="empty">__MSG_sessionsLoading__</div></div>
   </div>
 
   <div class="range-bar">
-    <label class="chk"><input id="rangeMode" type="checkbox" /> 选范围</label>
-    <span id="rangeInfo">点击下方截图可定位大步骤</span>
+    <label class="chk"><input id="rangeMode" type="checkbox" /> __MSG_rangePick__</label>
+    <span id="rangeInfo">__MSG_rangeHint__</span>
     <span class="m" id="selSummary"></span>
-    <button id="btnClearRange" class="ghost" hidden>清除选区</button>
-    <button id="btnSubmitRange" class="primary" hidden>按此范围去提交 →</button>
+    <button id="btnClearRange" class="ghost" hidden>__MSG_rangeClear__</button>
+    <button id="btnSubmitRange" class="primary" hidden>__MSG_rangeSubmit__</button>
   </div>
 
   <div id="timeline"></div>
 
   <div class="pages-head">
-    <b>大步骤</b>
-    <select id="listOrigin" title="区分人填写的修改意见和自动记录的事件">
-      <option value="all">全部</option>
-      <option value="human">人填写的</option>
-      <option value="event">事件记录</option>
+    <b>__MSG_stepsHead__</b>
+    <select id="listOrigin" title="__MSG_originTitle__">
+      <option value="all">__MSG_originAll__</option>
+      <option value="human">__MSG_originHuman__</option>
+      <option value="event">__MSG_originEvent__</option>
     </select>
-    <select id="pageSort" title="大步骤按开始时间排序">
-      <option value="asc">时间正序</option>
-      <option value="desc">时间倒序</option>
+    <select id="pageSort" title="__MSG_sortTitlePanel__">
+      <option value="asc">__MSG_sortAscTime__</option>
+      <option value="desc">__MSG_sortDescTime__</option>
     </select>
     <span class="view-filters" id="viewFilters">
-      <label class="chk"><input type="checkbox" data-view="isClickShown" checked /> 点击</label>
-      <label class="chk"><input type="checkbox" data-view="isKeyboardShown" checked /> 键盘</label>
-      <label class="chk"><input type="checkbox" data-view="isShotShown" checked /> 截图</label>
+      <label class="chk"><input type="checkbox" data-view="isClickShown" checked /> __MSG_filterClick__</label>
+      <label class="chk"><input type="checkbox" data-view="isKeyboardShown" checked /> __MSG_filterKey__</label>
+      <label class="chk"><input type="checkbox" data-view="isShotShown" checked /> __MSG_filterShot__</label>
       <label class="chk"><input type="checkbox" data-view="isVueShown" checked /> Vue</label>
       <label class="chk"><input type="checkbox" data-view="isConsoleShown" checked /> Console</label>
-      <label class="chk"><input type="checkbox" data-view="isRequestShown" checked /> 请求</label>
+      <label class="chk"><input type="checkbox" data-view="isRequestShown" checked /> __MSG_filterRequest__</label>
     </span>
     <span class="pager">
       <button id="pgPrev">‹</button>

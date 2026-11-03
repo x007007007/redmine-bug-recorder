@@ -9,12 +9,13 @@ import { initToolbar, renderAll, setNotifier } from './steps-ui';
 import { refreshSessions, selectSession } from './sessions-ui';
 import { selectionStable } from './selection';
 import { bindCaptureToggles } from './capture-ui';
+import { t } from '../shared/i18n';
 
 async function refreshRecState(): Promise<{ recording: boolean; sessionId: string | null }> {
   const st = await send({ type: 'GET_STATE' });
   $('dot').classList.toggle('on', st.recording);
-  $('recText').textContent = st.recording ? '录制中' : '未录制';
-  ($('btnToggleRec') as HTMLButtonElement).textContent = st.recording ? '■ 停止录制' : '● 开始录制';
+  $('recText').textContent = st.recording ? t('stateRecording') : t('stateIdle');
+  ($('btnToggleRec') as HTMLButtonElement).textContent = st.recording ? t('btnStop') : t('btnStart');
   return st;
 }
 
