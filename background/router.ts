@@ -1,12 +1,15 @@
 // 消息路由:popup / 管理页 → 后台各模块的唯一入口。
 // 统一约定:handler 返回值即响应;抛错则响应 { error }。
 
-import { getSettings, state, mem } from './state';
+import type { CaptureFlags } from '../shared/capture';
+import type { ChangeNote, RecorderSettings } from '../shared/types';
+import { getSettings, state, mem, saveCapture, currentState, whenCaptureReady } from './state';
 import { startRecording, stopRecording, onRecAction, onRecPinia } from './recorder';
 import { listSessions, getSession, deleteSession, deleteItems } from './sessions';
 import { getSelection, setSelection } from './selection';
 import { redmineEndpoints, submitRedmine } from './redmine-submit';
-import type { RecorderSettings } from '../shared/types';
+import { refreshDebuggerAttachment, recordPageConsole } from './net-cdp';
+import { onRecNote } from './notes';
 
 type Msg = { type: string } & Record<string, unknown>;
 type Handler = (msg: Msg, sender: chrome.runtime.MessageSender) => Promise<unknown>;
@@ -14,13 +17,19 @@ type Handler = (msg: Msg, sender: chrome.runtime.MessageSender) => Promise<unkno
 const HANDLERS: Record<string, Handler> = {
   REC_ACTION: (msg, sender) => onRecAction(msg as unknown as { action: never }, sender),
   REC_PINIA: (msg) => onRecPinia(msg as unknown as { event: never }),
+  REC_LOG: (msg) => Promise.resolve(recordPageConsole(String(msg.level || ''), String(msg.text || ''))),
+  REC_NOTE: (msg) => onRecNote((msg.note || {}) as Partial<ChangeNote>),
   START_RECORDING: () => startRecording(),
   STOP_RECORDING: () => stopRecording(),
-  GET_STATE: async () => ({
-    recording: state.recording,
-    sessionId: state.sessionId,
-    debuggerFailed: mem.debuggerFailed,
-  }),
+  GET_STATE: async () => {
+    await whenCaptureReady();
+    return currentState();
+  },
+  SET_CAPTURE: async (msg) => {
+    const flags = await saveCapture((msg.capture as Partial<CaptureFlags>) || {});
+    if (state.recording) await refreshDebuggerAttachment();
+    return flags;
+  },
   LIST_SESSIONS: () => listSessions(),
   GET_SESSION: (msg) => getSession(String(msg.id)),
   GET_SELECTION: (msg) => getSelection(String(msg.sessionId)),
@@ -35,7 +44,9 @@ const HANDLERS: Record<string, Handler> = {
     ),
   SETTINGS_GET: () => getSettings(),
   SETTINGS_SET: async (msg) => {
-    await chrome.storage.local.set({ recorderSettings: msg.settings as RecorderSettings });
+    await whenCaptureReady();
+    const settings = { ...(msg.settings as RecorderSettings), capture: mem.capture };
+    await chrome.storage.local.set({ recorderSettings: settings });
     return { ok: true };
   },
   SUBMIT_REDMINE: (msg) => submitRedmine(msg as unknown as Parameters<typeof submitRedmine>[0]),

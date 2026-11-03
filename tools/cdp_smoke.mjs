@@ -579,7 +579,15 @@ await evalJs(
 await sleep(1200);
 const twoCount = await evalJs(panel.sessionId, `chrome.runtime.sendMessage({type:'LIST_SESSIONS'}).then(r => r.length)`);
 ok('面板会话列表出现新建的空会话(共2个)', twoCount === 2, `当前 ${twoCount} 个`);
-await evalJs(panel.sessionId, `(() => { const it = document.querySelector('#sessionList .session-item[data-count="0"] .si-del'); if (it) it.click(); return !!it; })()`);
+await evalJs(panel.sessionId, `(() => {
+  const it = document.querySelector('#sessionList .session-item[data-count="0"] .si-del');
+  if (!it) return false;
+  it.click();
+  const ok = document.querySelector('#sessionList .session-item[data-count="0"] .si-del-ok');
+  if (!ok) return false;
+  ok.click();
+  return true;
+})()`);
 await sleep(1000);
 const oneCount = await evalJs(panel.sessionId, `chrome.runtime.sendMessage({type:'LIST_SESSIONS'}).then(r => r.length)`);
 ok('面板删除空会话成功(剩1个)', oneCount === 1, `剩余 ${oneCount} 个`);

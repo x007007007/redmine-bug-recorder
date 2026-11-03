@@ -22,6 +22,7 @@ const COMMON = {
 
 const entries = [
   { in: 'background/service-worker.ts', out: 'background/service-worker.js', format: 'esm' },
+  { in: 'content/console-hook.ts', out: 'content/console-hook.js', format: 'iife' },
   { in: 'content/recorder.ts', out: 'content/recorder.js', format: 'iife' },
   { in: 'content/vue-probe.ts', out: 'content/vue-probe.js', format: 'iife' },
   { in: 'popup/popup.ts', out: 'popup/popup.js', format: 'esm' },

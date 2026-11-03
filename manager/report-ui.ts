@@ -4,7 +4,9 @@ import { send } from './api';
 import { $, showError } from './dom';
 import { store } from './store';
 import { buildDescription } from '../shared/report';
-import { buildSubject } from '../shared/describe';
+import { ownedBySelection } from '../shared/timeline';
+import { buildSubject, fmtTime } from '../shared/describe';
+import type { IssueLink, RecorderSession } from '../shared/types';
 import { selectedActions } from './steps-ui';
 import { buildCsv } from './export-csv';
 
@@ -18,8 +20,8 @@ export function initReport(): void {
   $('bugSubject').addEventListener('input', () => (store.subjectDirty = true));
   $('bugDescription').addEventListener('input', () => (store.descDirty = true));
   $('btnRegen').addEventListener('click', () => {
-    regenerateDescription();
     store.descDirty = false;
+    regenerateDescription();
   });
   $('btnCopyDesc').addEventListener('click', onCopy);
   $('btnLoadProjects').addEventListener('click', () => void import('./settings-ui').then((m) => m.loadProjects()));
@@ -34,24 +36,27 @@ export function prefillForm(): void {
   $('submitResult').textContent = '';
   if (!store.subjectDirty) ($('bugSubject') as HTMLInputElement).value = session.subject || buildSubject(session, actions);
   if (!store.descDirty) regenerateDescription();
-  if (session.issueUrl && !$('submitResult').textContent.trim()) {
-    $('submitResult').innerHTML = `已提交:<a href="${session.issueUrl}" target="_blank">${session.issueUrl}</a>`;
-  }
+  renderIssueLinks(session);
 }
 
 export function regenerateDescription(): void {
   if (!store.cache) return;
   const acts = selectedActions();
-  const { session, requests, logs, pinia } = store.cache;
-  const lastArr = acts.length ? acts : store.cache.actions.slice(-1);
+  const ids = new Set(acts.map((a) => a.id).filter((id): id is number => typeof id === 'number'));
+  const { session, actions, requests, logs, pinia } = store.cache;
+  const lastArr = acts.length ? acts : actions.slice(-1);
   const lastUrl = lastArr.length ? lastArr[0]!.url : '';
   ($('bugDescription') as HTMLTextAreaElement).value = buildDescription(
     session,
     acts,
-    requests,
-    logs,
+    ownedBySelection(actions, ids, requests),
+    ownedBySelection(actions, ids, logs),
     { userAgent: navigator.userAgent, lastUrl },
-    { piniaEvents: pinia, shotLimit: shotLimit() }
+    {
+      piniaEvents: ownedBySelection(actions, ids, pinia),
+      shotLimit: shotLimit(),
+      notes: (store.full && store.full.notes) || store.cache.notes || [],
+    }
   );
 }
 
@@ -90,9 +95,14 @@ async function onSubmit(e: Event): Promise<void> {
       shotLimit: shotLimit(),
       selectedActionIds: [...store.selected],
     });
-    $('submitResult').innerHTML =
-      `✅ 已创建 issue <b>#${res.issueId}</b>(含 ${res.uploadCount} 张截图):` +
-      `<a href="${res.issueUrl}" target="_blank">${res.issueUrl}</a>`;
+    if (store.cache) {
+      store.cache.session.status = 'submitted';
+      store.cache.session.issueId = res.issueId;
+      store.cache.session.issueUrl = res.issueUrl;
+      store.cache.session.submissions = res.submissions;
+      renderIssueLinks(store.cache.session);
+    }
+    $('submitResult').textContent = res.uploadCount ? `已创建,含 ${res.uploadCount} 张截图` : '已创建';
     const { refreshSessions } = await import('./sessions-ui');
     void refreshSessions();
   } catch (err) {
@@ -101,6 +111,48 @@ async function onSubmit(e: Event): Promise<void> {
     btn.disabled = false;
     btn.textContent = '🚀 提交到 Redmine';
   }
+}
+
+export function issueLinksOf(session: RecorderSession): IssueLink[] {
+  if (session.submissions && session.submissions.length) return session.submissions;
+  if (session.issueId && session.issueUrl) {
+    return [{
+      issueId: session.issueId,
+      issueUrl: session.issueUrl,
+      subject: session.subject || '',
+      submittedAt: session.endedAt || session.startedAt,
+    }];
+  }
+  return [];
+}
+
+export function renderIssueLinks(session: RecorderSession): void {
+  const box = $('issueLinks');
+  box.textContent = '';
+  const links = issueLinksOf(session);
+  if (!links.length) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  const title = document.createElement('div');
+  title.className = 'issue-links-title';
+  title.textContent = `已提交 ${links.length} 个 issue`;
+  const list = document.createElement('ul');
+  for (const link of [...links].reverse()) {
+    const li = document.createElement('li');
+    const anchor = document.createElement('a');
+    anchor.href = link.issueUrl;
+    anchor.target = '_blank';
+    anchor.rel = 'noreferrer';
+    const subject = link.subject ? ` ${link.subject.slice(0, 42)}` : '';
+    anchor.textContent = `#${link.issueId}${subject}`;
+    const time = document.createElement('time');
+    time.textContent = fmtTime(link.submittedAt);
+    li.append(anchor, time);
+    list.appendChild(li);
+  }
+  box.append(title, list);
 }
 
 function onExport(): void {

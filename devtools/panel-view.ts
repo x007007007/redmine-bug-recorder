@@ -1,7 +1,7 @@
 // 面板 · 时间轴缩略图与大步骤分页列表的视图渲染/交互(定位/选范围/勾选)。
 
 import { $ } from '../manager/dom';
-import { buildPages } from '../shared/timeline';
+import { buildPages, filterVisiblePages, sortPages } from '../shared/timeline';
 import { describeAction } from '../shared/describe';
 import { renderPages, PAGE_SIZE, clockOf, type PageRow } from './panel-pages';
 import { panelState } from './panel-state';
@@ -93,14 +93,16 @@ export function renderPagesPage(): void {
     highlightKey: panelState.highlightKey,
     isSelected: (id) => panelState.selected.has(id),
     onTogglePage,
+    listOrigin: panelState.listOrigin,
+    captureView: panelState.captureView,
   });
 }
 
 function onTogglePage(p: PageGroup, checked: boolean): void {
   for (const a of p.actions) {
-    if (a.kind === 'navigate') continue;
-    if (checked) panelState.selected.add(a.id!);
-    else panelState.selected.delete(a.id!);
+    if (typeof a.id !== 'number') continue;
+    if (checked) panelState.selected.add(a.id);
+    else panelState.selected.delete(a.id);
   }
   hooks.persistSelection();
   renderPagesPage();
@@ -108,9 +110,16 @@ function onTogglePage(p: PageGroup, checked: boolean): void {
 }
 
 export function rebuildPages(): void {
-  panelState.pages = panelState.cache
-    ? buildPages(panelState.cache.actions, panelState.cache.requests, panelState.cache.pinia)
+  const built = panelState.cache
+    ? buildPages(
+        panelState.cache.actions,
+        panelState.cache.requests,
+        panelState.cache.pinia,
+        panelState.cache.logs,
+        panelState.cache.notes || []
+      )
     : [];
+  panelState.pages = filterVisiblePages(sortPages(built, panelState.pageSort), panelState.listOrigin, panelState.captureView);
 }
 
 export function setPage(idx: number): void {

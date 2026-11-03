@@ -6,6 +6,7 @@
 // 自动降级(选择器/输入值/Pinia 变化仍可用)。协议见 recorder.ts;序列化在 probe-serialize.ts。
 // 构建时打包为单个 IIFE 经典脚本。
 
+import { enqueue, publishVue } from './bridge';
 import { trunc, safeStringify, serializeProps } from './probe-serialize';
 import type { PiniaChange, VueInfo } from '../shared/types';
 
@@ -86,7 +87,7 @@ function install(): void {
 
   function dispatchPinia(detail: Record<string, unknown>): void {
     try {
-      document.dispatchEvent(new CustomEvent('bugrec:pinia', { detail }));
+      enqueue({ channel: 'pinia', event: detail });
     } catch {
       /* ignore */
     }
@@ -157,27 +158,15 @@ function install(): void {
 
   document.addEventListener(
     'bugrec:probe',
-    (e) => {
+    () => {
       // Firefox 下隔离世界 CustomEvent.detail 对页面不可读（Xray 不透明对象，
       // 读属性抛 "Permission denied to access property"）——防御性读取，失败
       // 时回退 window 通道（与 __bugrecVueProbe 标记同款跨 realm 通路）。
-      let id: string | undefined;
-      try {
-        id = (e as CustomEvent<{ id?: string }>).detail?.id;
-      } catch {
-        id = undefined;
-      }
-      if (!id) {
-        try {
-          id = (window as unknown as { __bugrecProbeId?: string }).__bugrecProbeId;
-        } catch {
-          id = undefined;
-        }
-      }
-      // 扁平结构:{ component, chain, props, piniaChanges, error }
+      // 元素 id 写在 DOM 属性上。Firefox 读不到跨世界的 detail / window 扩展属性。
+      const marked = document.querySelectorAll('[data-bugrec-eid]');
+      const el = marked.length ? marked[marked.length - 1]! : null;
       const info: VueInfo = { component: null, chain: [], props: null, piniaChanges: [] };
       try {
-        const el = id ? document.querySelector(`[data-bugrec-eid="${CSS.escape(id)}"]`) : null;
         const inst = el ? findInstance(el) : null;
         if (inst) {
           info.component = componentName(inst);
@@ -190,7 +179,8 @@ function install(): void {
       } catch (err) {
         info.error = String((err as { message?: string } | null)?.message ?? err);
       }
-      document.dispatchEvent(new CustomEvent('bugrec:vue-info', { detail: info }));
+      publishVue(info);
+      document.dispatchEvent(new Event('bugrec:vue-info'));
     },
     false
   );

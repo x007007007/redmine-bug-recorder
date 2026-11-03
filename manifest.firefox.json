@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bug Recorder for Redmine",
-  "version": "0.1.0",
+  "version": "0.2.4",
   "description": "测试助手:记录 UI 操作步骤(每步自动截图)与 API 交互,一键提交 Bug 到 Redmine。",
 
   "browser_specific_settings": {
@@ -24,6 +24,13 @@
   },
 
   "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content/console-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
     {
       "matches": ["http://*/*", "https://*/*"],
       "js": ["content/vue-probe.js"],
@@ -62,7 +69,8 @@
     "unlimitedStorage",
     "tabs",
     "activeTab",
-    "webRequest"
+    "webRequest",
+    "contextMenus"
   ],
   "host_permissions": ["<all_urls>"]
 }

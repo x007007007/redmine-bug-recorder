@@ -4,11 +4,17 @@ import { esc } from '../manager/dom';
 import { fmtTime } from '../shared/describe';
 import type { SessionSummary } from '../shared/types';
 
-export function renderSessions(
-  container: HTMLElement,
-  sessions: SessionSummary[],
-  opts: { currentId: string | null; activeId: string | null; onSelect: (id: string) => void; onDelete: (id: string) => void }
-): void {
+export interface SessionListOpts {
+  currentId: string | null;
+  activeId: string | null;
+  pendingDeleteId: string | null;
+  onSelect: (id: string) => void;
+  onAskDelete: (id: string) => void;
+  onCancelDelete: () => void;
+  onDelete: (id: string) => void;
+}
+
+export function renderSessions(container: HTMLElement, sessions: SessionSummary[], opts: SessionListOpts): void {
   container.textContent = '';
   if (!sessions.length) {
     container.innerHTML = '<div class="empty" style="color:#5f6368;padding:8px;">暂无会话,点上方「开始录制」</div>';
@@ -19,10 +25,7 @@ export function renderSessions(
   }
 }
 
-function buildItem(
-  s: SessionSummary,
-  opts: { currentId: string | null; activeId: string | null; onSelect: (id: string) => void; onDelete: (id: string) => void }
-): HTMLDivElement {
+function buildItem(s: SessionSummary, opts: SessionListOpts): HTMLDivElement {
   const row = document.createElement('div');
   row.className = 'session-item' + (s.id === opts.currentId ? ' sel' : '');
   row.dataset.id = s.id;
@@ -35,16 +38,46 @@ function buildItem(
   main.innerHTML =
     `<b>${esc(fmtTime(s.startedAt).slice(5))}</b>` +
     (s.id === opts.activeId ? ' <span class="live">● LIVE</span>' : '') +
-    `<span class="m"> ${statusText} · ${s.actionCount}步/${s.requestCount}API</span>`;
+    `<span class="m"> ${statusText} · ${s.actionCount}步/${s.requestCount}API${s.logCount ? `/${s.logCount}Console` : ''}</span>`;
   main.title = '点击切换到该会话';
   main.addEventListener('click', () => opts.onSelect(s.id));
 
-  const del = document.createElement('button');
-  del.className = 'si-del';
-  del.textContent = '✕';
-  del.title = '删除该会话(含截图/记录)';
-  del.addEventListener('click', () => opts.onDelete(s.id));
-
-  row.append(main, del);
+  row.append(main, buildDelete(s.id, opts));
   return row;
+}
+
+function buildDelete(id: string, opts: SessionListOpts): HTMLElement {
+  if (opts.pendingDeleteId !== id) {
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'si-del';
+    del.textContent = '✕';
+    del.title = '删除该会话(含截图/记录)';
+    del.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      opts.onAskDelete(id);
+    });
+    return del;
+  }
+  const box = document.createElement('span');
+  box.className = 'si-confirm';
+  const ok = document.createElement('button');
+  ok.type = 'button';
+  ok.className = 'si-del-ok';
+  ok.textContent = '删除';
+  ok.title = '确认删除该会话';
+  ok.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    opts.onDelete(id);
+  });
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'si-del-no';
+  cancel.textContent = '取消';
+  cancel.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    opts.onCancelDelete();
+  });
+  box.append(ok, cancel);
+  return box;
 }

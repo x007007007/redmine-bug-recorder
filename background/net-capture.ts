@@ -20,7 +20,7 @@ export function installNetCapture(): void {
 export { attachDebugger, detachAll } from './net-cdp';
 
 function onBeforeRequest(details: chrome.webRequest.OnBeforeRequestDetails): NoBlock {
-  if (!state.recording || !API_TYPES.has(details.type)) return undefined;
+  if (!state.recording || !mem.capture.isRequestEnabled || !API_TYPES.has(details.type)) return undefined;
   if (details.tabId != null && mem.debuggerTabs.has(details.tabId)) return undefined; // 该 tab 由 CDP 负责
   if ((details.initiator || '').startsWith('chrome-extension://')) return undefined;
   mem.webRequestPending.set(details.requestId, {
@@ -39,6 +39,7 @@ function onCompleted(details: chrome.webRequest.OnCompletedDetails): NoBlock {
   const e = mem.webRequestPending.get(details.requestId);
   if (!e) return undefined;
   mem.webRequestPending.delete(details.requestId);
+  if (!mem.capture.isRequestEnabled) return undefined;
   e.status = details.statusCode;
   e.durationMs = Math.max(0, Math.round(details.timeStamp - e.ts));
   e.contentType = pickHeader(details.responseHeaders, 'content-type');
@@ -51,6 +52,7 @@ function onError(details: chrome.webRequest.OnErrorOccurredDetails): NoBlock {
   const e = mem.webRequestPending.get(details.requestId);
   if (!e) return undefined;
   mem.webRequestPending.delete(details.requestId);
+  if (!mem.capture.isRequestEnabled) return undefined;
   e.error = details.error;
   dbAdd<RequestEntry>('requests', e).catch(() => {});
   notifySessionUpdated();

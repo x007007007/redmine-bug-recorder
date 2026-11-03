@@ -1,5 +1,6 @@
 // 共享状态与工具:录制会话状态(SW 休眠可恢复)、设置读取、徽章、通知。
 
+import { normalizeCapture, type CaptureFlags } from '../shared/capture';
 import type { RecorderSettings, RequestEntry, StateInfo } from '../shared/types';
 
 const SETTINGS_KEY = 'recorderSettings';
@@ -11,11 +12,13 @@ export const mem: {
   webRequestPending: Map<string, RequestEntry>;
   captureQueue: Promise<void>;
   debuggerFailed: boolean;
+  capture: CaptureFlags;
 } = {
   debuggerTabs: new Map(),
   webRequestPending: new Map(),
   captureQueue: Promise.resolve(),
   debuggerFailed: false,
+  capture: normalizeCapture(undefined),
 };
 
 export function sleep(ms: number): Promise<void> {
@@ -33,6 +36,7 @@ export async function initState(): Promise<void> {
     /* storage.session 不可用时忽略 */
   }
   updateBadge();
+  await whenCaptureReady();
 }
 
 export function persistState(): void {
@@ -55,7 +59,41 @@ export function updateBadge(): void {
 
 export async function getSettings(): Promise<RecorderSettings> {
   const o = (await chrome.storage.local.get(SETTINGS_KEY)) as { recorderSettings?: RecorderSettings };
-  return Object.assign({ captureBodies: true, attachScreenshots: true }, o[SETTINGS_KEY] || {});
+  const settings = Object.assign({ captureBodies: true, attachScreenshots: true }, o[SETTINGS_KEY] || {});
+  settings.capture = normalizeCapture(settings.capture);
+  return settings;
+}
+
+let captureLoaded: Promise<CaptureFlags> | null = null;
+
+export function whenCaptureReady(): Promise<CaptureFlags> {
+  if (!captureLoaded) captureLoaded = loadCapture();
+  return captureLoaded;
+}
+
+async function loadCapture(): Promise<CaptureFlags> {
+  const settings = await getSettings();
+  mem.capture = normalizeCapture(settings.capture);
+  return mem.capture;
+}
+
+export async function saveCapture(patch: Partial<CaptureFlags>): Promise<CaptureFlags> {
+  await whenCaptureReady();
+  const settings = await getSettings();
+  const capture = normalizeCapture({ ...mem.capture, ...patch });
+  mem.capture = capture;
+  settings.capture = capture;
+  await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
+  return capture;
+}
+
+export function currentState(): StateInfo {
+  return {
+    recording: state.recording,
+    sessionId: state.sessionId,
+    debuggerFailed: mem.debuggerFailed,
+    capture: mem.capture,
+  };
 }
 
 export function notifySessionUpdated(): void {

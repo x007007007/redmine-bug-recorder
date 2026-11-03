@@ -1,13 +1,14 @@
 // 管理页入口:初始化各 UI 模块、录制状态切换、实时刷新。
 
 import { send } from './api';
-import { $, showError } from './dom';
+import { $, showError, showVersion } from './dom';
 import { store } from './store';
 import { initSettings, loadSettings, loadTrackersAndPriorities } from './settings-ui';
 import { initReport, regenerateDescription } from './report-ui';
 import { initToolbar, renderAll, setNotifier } from './steps-ui';
 import { refreshSessions, selectSession } from './sessions-ui';
-import { persistSelection } from './selection';
+import { selectionStable } from './selection';
+import { bindCaptureToggles } from './capture-ui';
 
 async function refreshRecState(): Promise<{ recording: boolean; sessionId: string | null }> {
   const st = await send({ type: 'GET_STATE' });
@@ -39,14 +40,29 @@ chrome.runtime.onMessage.addListener((msg: { type?: string; sessionId?: string |
     void refreshSessions();
     // 正在查看的会话有新内容:静默刷新;已有勾选存档时尊重用户勾选(不整体重置)
     if (msg.sessionId === store.currentId && store.currentId) {
-      send({ type: 'GET_SESSION', id: store.currentId })
+      const rev = store.selectionRev;
+      const sid = store.currentId;
+      send({ type: 'GET_SESSION', id: sid })
         .then(async (data) => {
+          if (sid !== store.currentId) return;
+          const stable = await selectionStable(rev);
+          if (sid !== store.currentId) return;
           store.cache = data;
-          const persisted = await send({ type: 'GET_SELECTION', sessionId: store.currentId! }).catch(() => null);
+          if (!stable) {
+            renderAll();
+            return;
+          }
+          const persisted = await send({ type: 'GET_SELECTION', sessionId: sid }).catch(() => null);
+          if (rev !== store.selectionRev) {
+            renderAll();
+            return;
+          }
           if (persisted && persisted.ids) {
-            store.selected = new Set(persisted.ids); // 尊重已保存的勾选(新步骤保持未勾选)
+            store.selected = new Set(persisted.ids.filter((id) => typeof id === 'number'));
           } else {
-            for (const a of data.actions) store.selected.add(a.id!); // 无存档:默认全选
+            for (const a of data.actions) {
+              if (typeof a.id === 'number') store.selected.add(a.id);
+            }
           }
           renderAll();
           if (!store.descDirty) regenerateDescription();
@@ -58,6 +74,8 @@ chrome.runtime.onMessage.addListener((msg: { type?: string; sessionId?: string |
 
 (async function init(): Promise<void> {
   try {
+    showVersion();
+    bindCaptureToggles($('captureBar'));
     await loadSettings();
     initSettings();
     initReport();

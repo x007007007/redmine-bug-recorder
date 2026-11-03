@@ -1,6 +1,6 @@
 // 文案与格式化工具:操作/事件的可读描述、时间格式、截断。
 
-import type { PiniaEvent, RecordedAction, RecorderSession } from './types';
+import type { ChangeNote, LogEntry, PiniaEvent, RecordedAction, RecorderSession } from './types';
 
 export function fmtTime(ts: number): string {
   const d = new Date(ts);
@@ -48,6 +48,29 @@ export function describeAction(a: RecordedAction): string {
     default:
       return `${a.kind} ${a.label || ''} @ ${a.url}`;
   }
+}
+
+/** 元素定位:Vue 组件 + props + HTML 提示,给修改意见用 */
+export function describeElement(note: ChangeNote): string {
+  const bits: string[] = [];
+  const vue = note.vue;
+  if (vue && vue.component) {
+    const chain = vue.chain && vue.chain.length > 1 ? ` (${vue.chain.join(' > ')})` : '';
+    bits.push(`Vue ${vue.component}${chain}`);
+  }
+  if (vue && vue.props) bits.push(`props ${clip(vue.props, 180)}`);
+  if (note.htmlHint) bits.push(note.htmlHint);
+  if (note.selector) bits.push(note.selector);
+  return bits.join(' · ') || '(未定位到元素)';
+}
+
+export function describeNote(note: ChangeNote): string {
+  return `修改意见 ${describeElement(note)} → ${note.opinion}`;
+}
+
+export function describeLog(log: LogEntry): string {
+  const label = { error: '错误', warning: '警告', info: '信息', log: '日志' }[log.level] ?? log.level;
+  return `Console ${label}: ${log.text}`;
 }
 
 export function describePiniaEvent(ev: PiniaEvent): string {

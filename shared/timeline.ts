@@ -1,7 +1,7 @@
-// 统一时间线:把 操作步骤 / API 请求 / Pinia 事件 归入"页面(大步骤)"并按时间交错。
-// 页面边界:action 的 url 变化,或 navigate 动作。页面内只按 ts 排序,不再二次分组。
+// 统一时间线:把 操作步骤 / API 请求 / Pinia / Console 归入"页面(大步骤)"并按时间交错。
+// 页面边界只看地址是否变化。同一次打开里重复的「跳转到同一地址」不另开大步骤。
 
-import type { PageGroup, PiniaEvent, RecordedAction, RequestEntry, TimelineEntry } from './types';
+import type { ChangeNote, LogEntry, PageGroup, PiniaEvent, RecordedAction, RequestEntry, TimelineEntry } from './types';
 import { describeAction } from './describe';
 
 type PageRaw = {
@@ -16,16 +16,32 @@ type PageRaw = {
   endTime?: number;
 };
 
+/** 比较用地址:去掉 hash,避免同一页的锚点或重复加载被拆开 */
+export function pageUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.hash = '';
+    return u.origin + u.pathname + u.search;
+  } catch {
+    return url;
+  }
+}
+
 /** 首个页面之前的请求/事件归入前置伪页面(pseudo)。actions 按插入序=时间序,requests/piniaEvents 按 ts 升序 */
 export function buildPages(
   actions: RecordedAction[],
   requests: RequestEntry[] = [],
-  piniaEvents: PiniaEvent[] = []
+  piniaEvents: PiniaEvent[] = [],
+  logs: LogEntry[] = [],
+  notes: ChangeNote[] = []
 ): PageGroup[] {
   const pages: PageRaw[] = [];
   let cur: PageRaw | null = null;
   for (const a of actions) {
-    if (!cur || a.url !== cur.url || a.kind === 'navigate') {
+    const url = pageUrl(a.url);
+    const samePage = !!cur && pageUrl(cur.url) === url;
+    if (a.kind === 'navigate' && samePage) continue;
+    if (!cur || !samePage) {
       cur = { url: a.url, title: a.title || '', actions: [], startTs: a.ts, tabId: a.tabId };
       pages.push(cur);
     }
@@ -49,8 +65,10 @@ export function buildPages(
   for (const a of actions) buckets[pageIndexOf(a.ts)]!.push({ type: 'action', ts: a.ts, data: a, ownerStepIdx: -1 });
   for (const r of requests) buckets[pageIndexOf(r.ts)]!.push({ type: 'request', ts: r.ts, data: r, ownerStepIdx: -1 });
   for (const ev of piniaEvents) buckets[pageIndexOf(ev.ts)]!.push({ type: 'pinia', ts: ev.ts, data: ev, ownerStepIdx: -1 });
+  for (const log of logs) buckets[pageIndexOf(log.ts)]!.push({ type: 'log', ts: log.ts, data: log, ownerStepIdx: -1 });
+  for (const note of notes) buckets[pageIndexOf(note.ts)]!.push({ type: 'note', ts: note.ts, data: note, ownerStepIdx: -1 });
 
-  const TYPE_ORDER: Record<TimelineEntry['type'], number> = { action: 0, pinia: 1, request: 2 };
+  const TYPE_ORDER: Record<TimelineEntry['type'], number> = { action: 0, note: 1, pinia: 2, log: 3, request: 4 };
   pages.forEach((p, i) => {
     const entries = buckets[i]!.sort((x, y) => x.ts - y.ts || TYPE_ORDER[x.type] - TYPE_ORDER[y.type]);
     // 每个 entry 归属到页面内"最近一次 action"(ownerStepIdx)
@@ -82,9 +100,26 @@ export function buildPages(
   }));
 }
 
-/** UI 排序:只调换页面顺序,不动页面内部。mode: 'asc' | 'desc'(默认 desc,最新在前) */
+/** 事件归属到「不晚于它的最后一条步骤」。只留下归属步骤已被勾选的事件。 */
+export function ownedBySelection<T extends { ts: number }>(
+  actions: RecordedAction[],
+  selectedIds: Set<number>,
+  items: T[]
+): T[] {
+  const sorted = actions.filter((a) => typeof a.id === 'number').sort((a, b) => a.ts - b.ts || a.id! - b.id!);
+  return items.filter((item) => {
+    let owner: number | null = null;
+    for (const a of sorted) {
+      if (a.ts <= item.ts) owner = a.id!;
+      else break;
+    }
+    return owner != null && selectedIds.has(owner);
+  });
+}
+
+/** UI 排序:按大步骤开始时间排,不动页面内部。mode: 'asc' 时间正序 | 'desc' 最新在前 */
 export function sortPages(pages: PageGroup[], mode: 'asc' | 'desc' = 'desc'): PageGroup[] {
-  const out = [...pages];
+  const out = [...pages].sort((a, b) => a.startTime - b.startTime || a.orderIndex - b.orderIndex);
   if (mode === 'desc') out.reverse();
   return out;
 }
@@ -92,7 +127,73 @@ export function sortPages(pages: PageGroup[], mode: 'asc' | 'desc' = 'desc'): Pa
 function entrySearchText(e: TimelineEntry): string {
   if (e.type === 'action') return describeAction(e.data) + ' ' + (e.data.selector || '');
   if (e.type === 'request') return `${e.data.method} ${e.data.url} ${e.data.status ?? ''}`;
+  if (e.type === 'log') return `${e.data.level} ${e.data.text}`;
+  if (e.type === 'note') return `${e.data.opinion} ${e.data.selector} ${e.data.htmlHint}`;
   return `${e.data.storeId} ${e.data.action || ''} ${(e.data.keys || []).join(' ')}`;
+}
+
+export type ListOrigin = 'all' | 'human' | 'event';
+
+/** 人填写的是修改意见;其余是自动记下的事件 */
+export function isHumanEntry(entry: TimelineEntry): boolean {
+  return entry.type === 'note';
+}
+
+export function entryMatchesOrigin(entry: TimelineEntry, origin: ListOrigin = 'all'): boolean {
+  if (origin === 'all') return true;
+  return isHumanEntry(entry) === (origin === 'human');
+}
+
+/** 大步骤里按捕获类别显示。勾选的类别取并集;全部勾上时导航步骤也显示。 */
+export interface CaptureView {
+  isClickShown: boolean;
+  isKeyboardShown: boolean;
+  isShotShown: boolean;
+  isVueShown: boolean;
+  isConsoleShown: boolean;
+  isRequestShown: boolean;
+}
+
+export const SHOW_ALL_CAPTURE: CaptureView = {
+  isClickShown: true,
+  isKeyboardShown: true,
+  isShotShown: true,
+  isVueShown: true,
+  isConsoleShown: true,
+  isRequestShown: true,
+};
+
+function captureNarrowed(view: CaptureView): boolean {
+  return !view.isClickShown || !view.isKeyboardShown || !view.isShotShown || !view.isVueShown || !view.isConsoleShown || !view.isRequestShown;
+}
+
+export function entryMatchesCapture(entry: TimelineEntry, view: CaptureView = SHOW_ALL_CAPTURE): boolean {
+  if (entry.type === 'log') return view.isConsoleShown;
+  if (entry.type === 'request') return view.isRequestShown;
+  if (entry.type === 'pinia') return view.isVueShown;
+  if (entry.type === 'note') return true;
+  if (entry.type !== 'action') return true;
+  const action = entry.data;
+  if (action.kind === 'navigate') return !captureNarrowed(view) || !!(action.screenshot && view.isShotShown);
+  if (action.kind === 'click' && view.isClickShown) return true;
+  if ((action.kind === 'input' || action.kind === 'keypress' || action.kind === 'submit') && view.isKeyboardShown) return true;
+  if (action.screenshot && view.isShotShown) return true;
+  if (action.vue && action.vue.component && view.isVueShown) return true;
+  return false;
+}
+
+export function entryVisible(entry: TimelineEntry, origin: ListOrigin, view: CaptureView): boolean {
+  return entryMatchesOrigin(entry, origin) && entryMatchesCapture(entry, view);
+}
+
+/** 没有匹配条目的页面不显示。页面对象仍保留全部条目,避免过滤时误删。 */
+export function filterByOrigin(pages: PageGroup[], origin: ListOrigin = 'all'): PageGroup[] {
+  if (origin === 'all') return pages;
+  return pages.filter((page) => page.entries.some((entry) => entryMatchesOrigin(entry, origin)));
+}
+
+export function filterVisiblePages(pages: PageGroup[], origin: ListOrigin, view: CaptureView): PageGroup[] {
+  return pages.filter((page) => page.entries.some((entry) => entryVisible(entry, origin, view)));
 }
 
 /** 搜索过滤:匹配 URL / 标题 / 步骤文案 / API 路径 / Pinia store */

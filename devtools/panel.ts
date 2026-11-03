@@ -2,7 +2,8 @@
 //(与提交页经 storage.session 实时同步)、选范围提交。
 
 import { send } from '../manager/api';
-import { $ } from '../manager/dom';
+import { bindCaptureToggles } from '../manager/capture-ui';
+import { $, showVersion } from '../manager/dom';
 import { renderSessions } from './panel-sessions';
 import { panelState } from './panel-state';
 import {
@@ -17,9 +18,11 @@ import {
   submitRangeUi,
   updateSelSummary,
 } from './panel-view';
+import type { CaptureView } from '../shared/timeline';
 import type { SessionSummary, StateInfo, SubmitRange } from '../shared/types';
 
 function init(): void {
+  showVersion();
   $('btnToggle').addEventListener('click', () => {
     void (async () => {
       const st = await send({ type: 'GET_STATE' });
@@ -37,6 +40,25 @@ function init(): void {
   $('btnSubmitRange').addEventListener('click', submitRangeUi);
   $('pgPrev').addEventListener('click', () => setPage(panelState.pageIdx - 1));
   $('pgNext').addEventListener('click', () => setPage(panelState.pageIdx + 1));
+  $('listOrigin').addEventListener('change', () => {
+    panelState.listOrigin = ($('listOrigin') as HTMLSelectElement).value as 'all' | 'human' | 'event';
+    rebuildPages();
+    setPage(0);
+  });
+  $('viewFilters').addEventListener('change', (ev) => {
+    const input = ev.target;
+    if (!(input instanceof HTMLInputElement) || !input.dataset.view) return;
+    const key = input.dataset.view as keyof CaptureView;
+    panelState.captureView = { ...panelState.captureView, [key]: input.checked };
+    rebuildPages();
+    setPage(0);
+  });
+  $('pageSort').addEventListener('change', () => {
+    panelState.pageSort = ($('pageSort') as HTMLSelectElement).value as 'asc' | 'desc';
+    rebuildPages();
+    setPage(0);
+  });
+  bindCaptureToggles($('captureBar'));
   chrome.runtime.onMessage.addListener((msg: { type?: string }) => {
     if (msg && msg.type === 'SESSION_UPDATED') void refreshState();
   });
@@ -77,16 +99,12 @@ async function refreshState(): Promise<void> {
   ($('btnToggle') as HTMLButtonElement).textContent = st.recording ? '■ 停止录制' : '● 开始录制';
 
   panelState.sessions = (await send({ type: 'LIST_SESSIONS' })) as SessionSummary[];
-  renderSessions($('sessionList'), panelState.sessions, {
-    currentId: panelState.sessionId,
-    activeId: panelState.activeId,
-    onSelect: (id) => {
-      panelState.sessionId = id;
-      panelState.highlightKey = null;
-      void refreshState();
-    },
-    onDelete: (id) => void deleteSession(id),
-  });
+  const listed = new Set(panelState.sessions.map((s) => s.id));
+  if (!panelState.sessionId || !listed.has(panelState.sessionId)) {
+    panelState.sessionId = st.sessionId && listed.has(st.sessionId) ? st.sessionId : (panelState.sessions[0]?.id ?? null);
+  }
+  $('sessCount').textContent = panelState.sessions.length ? `${panelState.sessions.length} 个` : '暂无';
+  paintSessions();
 
   panelState.cache = panelState.sessionId ? await send({ type: 'GET_SESSION', id: panelState.sessionId }) : null;
   await loadSelection();
@@ -97,34 +115,86 @@ async function refreshState(): Promise<void> {
   (window as unknown as Record<string, unknown>).__bugrecPanelState = panelState; // 测试钩子
 }
 
-async function deleteSession(id: string): Promise<void> {
-  if (!confirm('删除该会话及其所有截图/记录?')) return;
-  await send({ type: 'DELETE_SESSION', id });
-  if (panelState.sessionId === id) panelState.sessionId = null;
-  await refreshState();
+function paintSessions(): void {
+  if (panelState.pendingDeleteId && !panelState.sessions.some((s) => s.id === panelState.pendingDeleteId)) {
+    panelState.pendingDeleteId = null;
+  }
+  renderSessions($('sessionList'), panelState.sessions, {
+    currentId: panelState.sessionId,
+    activeId: panelState.activeId,
+    pendingDeleteId: panelState.pendingDeleteId,
+    onSelect: (id) => {
+      panelState.sessionId = id;
+      panelState.highlightKey = null;
+      panelState.pendingDeleteId = null;
+      void refreshState();
+    },
+    onAskDelete: (id) => {
+      panelState.pendingDeleteId = id;
+      paintSessions();
+    },
+    onCancelDelete: () => {
+      panelState.pendingDeleteId = null;
+      paintSessions();
+    },
+    onDelete: (id) => void deleteSession(id),
+  });
 }
 
+async function deleteSession(id: string): Promise<void> {
+  panelState.pendingDeleteId = null;
+  try {
+    if (panelState.recording && panelState.activeId === id) await send({ type: 'STOP_RECORDING' });
+    await send({ type: 'DELETE_SESSION', id });
+    if (panelState.sessionId === id) panelState.sessionId = null;
+    $('sessHint').textContent = '已删除';
+    await refreshState();
+  } catch (e) {
+    $('sessHint').textContent = '删除失败: ' + String((e as { message?: string }).message ?? e);
+    paintSessions();
+  }
+}
+
+let selectionGate: Promise<void> = Promise.resolve();
+
 async function loadSelection(): Promise<void> {
+  const rev = panelState.selectionRev;
   const acts = panelState.cache?.actions ?? [];
+  const fallback = acts.map((a) => a.id).filter((id): id is number => typeof id === 'number');
   if (!panelState.sessionId) {
-    panelState.selected = new Set(acts.map((a) => a.id!));
+    panelState.selected = new Set(fallback);
     return;
   }
+  await selectionGate;
+  if (rev !== panelState.selectionRev || !panelState.sessionId) return;
   const res = await send({ type: 'GET_SELECTION', sessionId: panelState.sessionId });
-  panelState.selected = new Set(res.ids ?? acts.map((a) => a.id!));
+  if (rev !== panelState.selectionRev) return;
+  const ids = res.ids ? res.ids.filter((id) => typeof id === 'number') : fallback;
+  panelState.selected = new Set(ids);
 }
 
 async function persistSelection(): Promise<void> {
   if (!panelState.sessionId) return;
-  const ids = [...panelState.selected];
-  const write = async (): Promise<void> => {
-    await send({ type: 'SET_SELECTION', sessionId: panelState.sessionId!, ids });
-  };
-  // 写后读回校验;SW 冷启动等瞬窗失败时重试一次
+  panelState.selectionRev += 1;
+  const rev = panelState.selectionRev;
+  const sessionId = panelState.sessionId;
+  const ids = [...panelState.selected].filter((id) => typeof id === 'number');
+  const job = selectionGate.then(() => writeSelection(rev, sessionId, ids));
+  selectionGate = job.then(
+    () => undefined,
+    () => undefined
+  );
+  await job;
+}
+
+async function writeSelection(rev: number, sessionId: string, ids: number[]): Promise<void> {
+  if (rev !== panelState.selectionRev) return;
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (rev !== panelState.selectionRev) return;
     try {
-      await write();
-      const back = await send({ type: 'GET_SELECTION', sessionId: panelState.sessionId });
+      await send({ type: 'SET_SELECTION', sessionId, ids });
+      const back = await send({ type: 'GET_SELECTION', sessionId });
+      if (rev !== panelState.selectionRev) return;
       if (back.ids && back.ids.length === ids.length) return;
     } catch {
       /* 重试 */

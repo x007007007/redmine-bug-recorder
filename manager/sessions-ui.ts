@@ -5,7 +5,7 @@ import { $, esc, showError } from './dom';
 import { store } from './store';
 import { fmtTime } from '../shared/describe';
 import { renderAll } from './steps-ui';
-import { prefillForm } from './report-ui';
+import { issueLinksOf, prefillForm } from './report-ui';
 import { readPendingRange, applyScope, renderScopeBanner } from './range';
 import { loadSelection } from './selection';
 import type { RecorderSession, SessionSummary } from '../shared/types';
@@ -41,9 +41,19 @@ function buildSessionItem(s: SessionSummary): HTMLDivElement {
   sub.append(
     chip,
     document.createTextNode(
-      ` 步骤 ${s.actionCount} · API ${s.requestCount}${s.piniaCount ? ` · Pinia ${s.piniaCount}` : ''}`
+      ` 步骤 ${s.actionCount} · API ${s.requestCount}${s.logCount ? ` · Console ${s.logCount}` : ''}${s.piniaCount ? ` · Pinia ${s.piniaCount}` : ''}`
     )
   );
+  for (const link of [...issueLinksOf(s)].reverse()) {
+    const anchor = document.createElement('a');
+    anchor.href = link.issueUrl;
+    anchor.target = '_blank';
+    anchor.rel = 'noreferrer';
+    anchor.textContent = `#${link.issueId}`;
+    anchor.title = link.issueUrl;
+    anchor.addEventListener('click', (ev) => ev.stopPropagation());
+    sub.appendChild(anchor);
+  }
 
   const del = document.createElement('button');
   del.className = 'del';
@@ -101,6 +111,7 @@ export async function selectSession(id: string): Promise<void> {
 function setDetailVisible(has: boolean): void {
   $('sessionDetail').hidden = !has;
   $('noSession').hidden = has;
+  $('submitDock').hidden = !has;
 }
 
 export { esc };

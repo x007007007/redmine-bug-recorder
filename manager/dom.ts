@@ -4,6 +4,13 @@ import { errText } from '../shared/types';
 
 export const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
 
+/** 显示当前已加载扩展的 manifest 版本,方便确认测的是哪一版 */
+export function showVersion(id = 'extVer'): void {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = `v${chrome.runtime.getManifest().version}`;
+}
+
 export function esc(s: unknown): string {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }

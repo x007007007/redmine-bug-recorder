@@ -4,10 +4,12 @@
 import { dbAdd, dbGet, dbPut, dbCountByIndex } from '../shared/db';
 import { state, mem, sleep, persistState, updateBadge, notifySessionUpdated } from './state';
 import { attachDebugger, detachAll } from './net-cdp';
+import { pageUrl } from '../shared/timeline';
 import type { PiniaEvent, RecordedAction, RecorderSession } from '../shared/types';
 
 const SHOT_DELAY_MS = 380;
 const MAX_PINIA_PER_SESSION = 500;
+const lastPageByTab = new Map<number, string>();
 
 export function installRecorder(): void {
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -34,6 +36,7 @@ export async function startRecording(): Promise<{ ok: boolean; sessionId?: strin
   state.recording = true;
   state.sessionId = id;
   mem.debuggerFailed = false;
+  lastPageByTab.clear();
   persistState();
   updateBadge();
 
@@ -63,6 +66,7 @@ export async function stopRecording(): Promise<{ ok: boolean; sessionId?: string
   updateBadge();
   detachAll();
   mem.webRequestPending.clear();
+  lastPageByTab.clear();
   notifySessionUpdated();
   return { ok: true, sessionId: session ? session.id : null };
 }
@@ -78,6 +82,8 @@ export async function onRecAction(
     tabId: tab ? tab.id : null,
     windowId: tab ? tab.windowId : null,
   }) as RecordedAction;
+  if (!isActionEnabled(a) || isRecorderChrome(a)) return { recorded: false };
+  if (!mem.capture.isVueEnabled) a.vue = null;
   const id = await dbAdd<RecordedAction>('actions', a);
   notifySessionUpdated();
   if (tab) void attachDebugger(tab.id ?? null);
@@ -86,7 +92,7 @@ export async function onRecAction(
 }
 
 export async function onRecPinia(msg: { event: Omit<PiniaEvent, 'sessionId' | 'ts'> }): Promise<{ recorded: boolean; capped?: boolean }> {
-  if (!state.recording || !state.sessionId) return { recorded: false };
+  if (!state.recording || !state.sessionId || !mem.capture.isVueEnabled) return { recorded: false };
   const count = await dbCountByIndex('pinia', 'bySession', state.sessionId);
   if (count >= MAX_PINIA_PER_SESSION) return { recorded: false, capped: true };
   const ev: PiniaEvent = Object.assign({}, msg.event, { sessionId: state.sessionId, ts: Date.now() });
@@ -97,6 +103,10 @@ export async function onRecPinia(msg: { event: Omit<PiniaEvent, 'sessionId' | 't
 
 async function pushNavigate(tab: chrome.tabs.Tab, url: string, label: string): Promise<void> {
   if (!/^https?:/.test(url) || !state.sessionId) return;
+  const tabId = tab.id ?? null;
+  const canon = pageUrl(url);
+  if (tabId != null && lastPageByTab.get(tabId) === canon) return;
+  if (tabId != null) lastPageByTab.set(tabId, canon);
   const id = await dbAdd<RecordedAction>('actions', {
     sessionId: state.sessionId,
     kind: 'navigate',
@@ -125,7 +135,20 @@ async function captureShot(windowId: number | null, tabId: number | null): Promi
   }
 }
 
+function isRecorderChrome(a: RecordedAction): boolean {
+  const text = `${a.selector || ''} ${a.label || ''}`;
+  return text.includes('bugrec-note-host') || text.includes('bugrec-bridge');
+}
+
+function isActionEnabled(a: RecordedAction): boolean {
+  if (a.kind === 'click') return mem.capture.isClickEnabled;
+  if (a.kind === 'keypress') return mem.capture.isKeyboardEnabled;
+  if (a.kind === 'input' && a.inputType === 'keyboard') return mem.capture.isKeyboardEnabled;
+  return true;
+}
+
 function queueShot(actionId: number, tabId: number | null, windowId: number | null): void {
+  if (!mem.capture.isScreenshotEnabled) return;
   mem.captureQueue = mem.captureQueue
     .then(async () => {
       await sleep(SHOT_DELAY_MS);

@@ -1,8 +1,9 @@
 // 页面(大步骤)分组 DOM 构建:头部(折叠/全选/标题/整页删除)+ 统一时间线条目。
 // 纯构建逻辑,交互回调由 steps-ui 通过 handlers 注入,避免模块循环。
 
+import { entryVisible, type CaptureView, type ListOrigin } from '../shared/timeline';
 import { esc } from './dom';
-import { buildActionRow, buildRequestRow, buildPiniaRow } from './entry-ui';
+import { buildActionRow, buildRequestRow, buildLogRow, buildNoteRow, buildPiniaRow } from './entry-ui';
 import type { PageGroup, RecordedAction } from '../shared/types';
 
 export interface PageCtx {
@@ -10,6 +11,8 @@ export interface PageCtx {
   shots: Map<number | undefined, string>;
   tabMap: Map<number, number>;
   multiTab: boolean;
+  listOrigin: ListOrigin;
+  captureView: CaptureView;
 }
 
 export interface PageHandlers {
@@ -34,6 +37,7 @@ export function buildPageGroup(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTM
   bodyEl.className = 'page-body';
   const numOf = stepNumbers(p);
   for (const e of p.entries) {
+    if (!entryVisible(e, ctx.listOrigin, ctx.captureView)) continue;
     if (e.type === 'action') {
       bodyEl.appendChild(
         buildActionRow(e.data, {
@@ -47,6 +51,10 @@ export function buildPageGroup(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTM
       );
     } else if (e.type === 'request') {
       bodyEl.appendChild(buildRequestRow(e.data));
+    } else if (e.type === 'log') {
+      bodyEl.appendChild(buildLogRow(e.data));
+    } else if (e.type === 'note') {
+      bodyEl.appendChild(buildNoteRow(e.data));
     } else {
       bodyEl.appendChild(buildPiniaRow(e.data));
     }
@@ -67,11 +75,15 @@ function buildHead(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTMLDivElement 
   head.appendChild(caret);
 
   if (!p.pseudo) {
+    const selectable = p.actions.filter((a) => typeof a.id === 'number');
+    const selCount = selectable.filter((a) => h.isSelected(a)).length;
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'page-cb';
-    cb.checked = p.actions.every((a) => h.isSelected(a));
-    cb.title = '全选该页步骤';
+    cb.checked = selectable.length > 0 && selCount === selectable.length;
+    cb.indeterminate = selCount > 0 && selCount < selectable.length;
+    cb.disabled = selectable.length === 0;
+    cb.title = `勾选该页步骤(已选 ${selCount}/${selectable.length})`;
     cb.addEventListener('change', () => h.onTogglePage(p, cb.checked));
     head.appendChild(cb);
   }
@@ -82,12 +94,13 @@ function buildHead(p: PageGroup, ctx: PageCtx, h: PageHandlers): HTMLDivElement 
   const tab = ctx.multiTab && p.tabId != null ? ` · 标签页 ${ctx.tabMap.get(p.tabId) || '?'}` : '';
   const counts = p.entries.filter((e) => e.type === 'action').length;
   const apiCount = p.entries.filter((e) => e.type === 'request').length;
+  const logCount = p.entries.filter((e) => e.type === 'log').length;
   const navShot = p.actions.find((a) => a.kind === 'navigate');
   const shot = navShot ? ctx.shots.get(navShot.id) : null;
   title.innerHTML =
     `📄 <b>大步骤 ${p.orderIndex}</b> · ${esc(p.url)}` +
     (p.title ? ` <span class="count">(${esc(p.title)})</span>` : '') +
-    ` <span class="count">· ${clock}${tab} · ${counts} 步 / ${apiCount} API${shot ? ' · 整页截图 ✓' : ''}</span>`;
+    ` <span class="count">· ${clock}${tab} · ${counts} 步 / ${apiCount} API${logCount ? ` / ${logCount} Console` : ''}${shot ? ' · 整页截图 ✓' : ''}</span>`;
   head.appendChild(title);
 
   const delPage = document.createElement('button');

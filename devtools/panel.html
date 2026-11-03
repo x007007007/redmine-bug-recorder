@@ -5,15 +5,19 @@
   <link rel="stylesheet" href="panel.css" />
 </head>
 <body>
-  <header>
-    <span class="dot" id="dot"></span>
-    <span id="recText">未录制</span>
-    <button id="btnToggle" class="primary">● 开始录制</button>
-    <button id="btnOpenMgr" title="打开提交/管理页">🚀 提交</button>
-  </header>
+  <div class="top">
+    <header>
+      <span class="dot" id="dot"></span>
+      <span id="recText">未录制</span>
+      <span id="extVer"></span>
+      <button id="btnToggle" class="primary">● 开始录制</button>
+      <button id="btnOpenMgr" title="打开提交/管理页">🚀 提交</button>
+      <div id="captureBar" class="capture-bar"></div>
+    </header>
 
-  <div class="sessions-head"><b>会话</b><span class="m" id="sessHint">(点击切换 · ✕ 删除)</span></div>
-  <div id="sessionList"></div>
+    <div class="sessions-head"><b>会话列表</b><span class="m" id="sessCount">加载中…</span><span class="m" id="sessHint">点击切换 · ✕ 删除</span></div>
+    <div id="sessionList"><div class="empty">正在加载会话列表…</div></div>
+  </div>
 
   <div class="range-bar">
     <label class="chk"><input id="rangeMode" type="checkbox" /> 选范围</label>
@@ -27,6 +31,23 @@
 
   <div class="pages-head">
     <b>大步骤</b>
+    <select id="listOrigin" title="区分人填写的修改意见和自动记录的事件">
+      <option value="all">全部</option>
+      <option value="human">人填写的</option>
+      <option value="event">事件记录</option>
+    </select>
+    <select id="pageSort" title="大步骤按开始时间排序">
+      <option value="asc">时间正序</option>
+      <option value="desc">时间倒序</option>
+    </select>
+    <span class="view-filters" id="viewFilters">
+      <label class="chk"><input type="checkbox" data-view="isClickShown" checked /> 点击</label>
+      <label class="chk"><input type="checkbox" data-view="isKeyboardShown" checked /> 键盘</label>
+      <label class="chk"><input type="checkbox" data-view="isShotShown" checked /> 截图</label>
+      <label class="chk"><input type="checkbox" data-view="isVueShown" checked /> Vue</label>
+      <label class="chk"><input type="checkbox" data-view="isConsoleShown" checked /> Console</label>
+      <label class="chk"><input type="checkbox" data-view="isRequestShown" checked /> 请求</label>
+    </span>
     <span class="pager">
       <button id="pgPrev">‹</button>
       <span id="pgInfo">1 / 1</span>

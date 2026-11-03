@@ -14,12 +14,16 @@ body {
 }
 
 header {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
   padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--line);
   position: sticky; top: 0; z-index: 5;
 }
+.capture-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-left: auto; font-size: 12px; }
+.capture-bar .cap-label { color: var(--muted); font-weight: 600; }
+.capture-bar .chk { display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text); }
 h1 { font-size: 17px; }
 h1 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+#extVer { color: var(--muted); font-size: 12px; font-weight: 500; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--bg); border: 1px solid var(--line);
@@ -71,6 +75,7 @@ aside {
 .session.sel { background: #fce8e6; }
 .session .t { font-size: 13px; font-weight: 600; }
 .session .s { font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.session .s a { color: #188038; font-weight: 600; }
 .status-chip { font-size: 11px; padding: 1px 8px; border-radius: 999px; }
 .status-recording { background: #fce8e6; color: var(--accent); }
 .status-stopped { background: #e8f0fe; color: #1a73e8; }
@@ -96,6 +101,8 @@ h3:first-of-type { margin-top: 14px; }
 .steps-toolbar { margin-bottom: 8px; }
 .steps-toolbar #searchBox { flex: 1; min-width: 200px; }
 .steps-toolbar select { width: auto; }
+.view-filters { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.view-filters .chk { display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--text); }
 .page-group { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .page-head {
   display: flex; align-items: center; gap: 8px; padding: 8px 12px;
@@ -150,6 +157,19 @@ h3:first-of-type { margin-top: 14px; }
 .entry-pinia .pinia-line {
   font: 12px ui-monospace, Menlo, monospace; color: #b06000;
 }
+.entry-log {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 5px 12px; border-top: 1px solid var(--bg);
+  font: 12px ui-monospace, Menlo, monospace;
+}
+.entry-note {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 5px 12px; border-top: 1px solid var(--bg);
+  font: 12px ui-monospace, Menlo, monospace; color: #7b1fa2;
+}
+.entry-log.log, .entry-log.info { color: #3c4043; }
+.entry-log.error { color: #c5221f; }
+.entry-log.warning { color: #b06000; }
 
 .badge {
   font-size: 11px; padding: 1px 8px; border-radius: 999px; background: #e8f0fe; color: #1a73e8;
@@ -181,7 +201,27 @@ h3:first-of-type { margin-top: 14px; }
 }
 .req .lbl { padding: 0 12px; color: var(--muted); font-size: 11px; }
 
-#bugForm { display: grid; gap: 10px; max-width: 860px; }
+#submitDock {
+  position: fixed; right: 16px; bottom: 16px; z-index: 20;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(72vh, 640px);
+  overflow: auto;
+  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(32, 33, 36, 0.18);
+  padding: 12px 14px 14px;
+}
+#submitDock[hidden] { display: none; }
+.issue-links { margin-bottom: 10px; padding: 8px 10px; background: #e6f4ea; border-radius: 8px; }
+.issue-links-title { font-size: 12px; font-weight: 600; color: #188038; }
+.issue-links ul { list-style: none; display: grid; gap: 4px; margin-top: 6px; }
+.issue-links li { display: flex; gap: 8px; align-items: baseline; }
+.issue-links a { color: #188038; font-weight: 600; word-break: break-all; }
+.issue-links time { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.dock-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.dock-head b { font-size: 14px; }
+#dockSel { color: var(--muted); font-size: 12px; }
+.dock-head #btnRegen { margin-left: auto; }
+#bugForm { display: grid; gap: 10px; }
 #bugForm label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
 #bugForm label.chk { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 #submitResult { font-size: 13px; }

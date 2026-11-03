@@ -14,7 +14,7 @@ import { planShotUploads } from '../shared/shots';
 import { dbPut, dbGet } from '../shared/db';
 import { getSettings, notifySessionUpdated } from './state';
 import { getSession } from './sessions';
-import type { RecordedAction, RecorderSession, RecorderSettings, SubmitResult } from '../shared/types';
+import type { IssueLink, RecordedAction, RecorderSession, RecorderSettings, SubmitResult } from '../shared/types';
 
 export const redmineEndpoints: Record<
   string,
@@ -79,13 +79,46 @@ export async function submitRedmine(msg: {
   const resp = await createIssue(settings, { issue });
   const issueId = resp && resp.issue ? resp.issue.id : null;
 
+  const issueUrl = issueId ? `${(settings.redmineUrl || '').replace(/\/+$/, '')}/issues/${issueId}` : null;
+  const submissions = appendSubmission(session, {
+    issueId,
+    issueUrl,
+    subject: msg.subject,
+    submittedAt: Date.now(),
+  });
   session.status = 'submitted';
   session.issueId = issueId;
-  session.issueUrl = issueId ? `${(settings.redmineUrl || '').replace(/\/+$/, '')}/issues/${issueId}` : null;
+  session.issueUrl = issueUrl;
+  session.submissions = submissions;
   await dbPut('sessions', session);
   notifySessionUpdated();
 
-  return { issueId, issueUrl: session.issueUrl, uploadCount: uploads.length };
+  return { issueId, issueUrl, uploadCount: uploads.length, submissions };
+}
+
+/** 保留历次提交。旧数据只有一条 issueUrl 时,先补进列表再追加本次。 */
+function appendSubmission(
+  session: RecorderSession,
+  next: { issueId: number | null; issueUrl: string | null; subject: string; submittedAt: number }
+): IssueLink[] {
+  const history = Array.isArray(session.submissions) ? session.submissions.slice() : [];
+  if (!history.length && session.issueId && session.issueUrl) {
+    history.push({
+      issueId: session.issueId,
+      issueUrl: session.issueUrl,
+      subject: session.subject || '',
+      submittedAt: session.endedAt || session.startedAt,
+    });
+  }
+  if (next.issueId && next.issueUrl && !history.some((item) => item.issueId === next.issueId)) {
+    history.push({
+      issueId: next.issueId,
+      issueUrl: next.issueUrl,
+      subject: next.subject || '',
+      submittedAt: next.submittedAt,
+    });
+  }
+  return history;
 }
 
 /** 在截图上烙入半透明点击标记:外圈描边 + 内圈半透明填充 */

@@ -7,7 +7,7 @@ import {
   dbListByIndex,
   dbCountByIndex,
 } from '../shared/db';
-import type { LogEntry, PiniaEvent, RecordedAction, RecorderSession, RequestEntry, SessionDetail, SessionSummary } from '../shared/types';
+import type { ChangeNote, LogEntry, PiniaEvent, RecordedAction, RecorderSession, RequestEntry, SessionDetail, SessionSummary } from '../shared/types';
 
 export async function listSessions(): Promise<SessionSummary[]> {
   const sessions = await dbAll<RecorderSession>('sessions');
@@ -32,11 +32,12 @@ export async function getSession(id: string): Promise<SessionDetail> {
   const requests = (await dbListByIndex<RequestEntry>('requests', 'bySession', id)).sort((a, b) => a.ts - b.ts);
   const logs = (await dbListByIndex<LogEntry>('logs', 'bySession', id)).sort((a, b) => a.ts - b.ts).slice(-100);
   const pinia = (await dbListByIndex<PiniaEvent>('pinia', 'bySession', id)).sort((a, b) => a.ts - b.ts);
-  return { session, actions, requests, logs, pinia };
+  const notes = (await dbListByIndex<ChangeNote>('notes', 'bySession', id)).sort((a, b) => a.ts - b.ts);
+  return { session, actions, requests, logs, pinia, notes };
 }
 
 export async function deleteSession(id: string): Promise<{ ok: true }> {
-  for (const store of ['actions', 'requests', 'logs', 'pinia'] as const) {
+  for (const store of ['actions', 'requests', 'logs', 'pinia', 'notes'] as const) {
     const items = await dbListByIndex<{ id: number }>(store, 'bySession', id);
     for (const item of items) {
       await dbDelete(store, item.id);

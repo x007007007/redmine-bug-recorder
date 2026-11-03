@@ -4,8 +4,10 @@ import { initState } from './state';
 import { installNetCapture } from './net-capture';
 import { installRecorder } from './recorder';
 import { installRouter } from './router';
+import { installNotes } from './notes';
 
 installNetCapture();
 installRecorder();
+installNotes();
 installRouter();
 void initState();

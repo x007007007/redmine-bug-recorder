@@ -1,8 +1,8 @@
 // 时间线条目行构建:操作行(勾选/截图+点击标记/删除)、API 行(可展开请求/响应体)、Pinia 行。
 
-import { fmtClock, describeAction, describePiniaEvent } from '../shared/describe';
+import { fmtClock, describeAction, describeElement, describeLog, describePiniaEvent } from '../shared/describe';
 import { esc, shortenUrl } from './dom';
-import type { RecordedAction, PiniaEvent, RequestEntry } from '../shared/types';
+import type { ChangeNote, LogEntry, RecordedAction, PiniaEvent, RequestEntry } from '../shared/types';
 
 export interface ActionRowOpts {
   num: number;
@@ -23,7 +23,11 @@ export function buildActionRow(a: RecordedAction, opts: ActionRowOpts): HTMLDivE
   cb.type = 'checkbox';
   cb.className = 'step-cb';
   cb.checked = selected;
-  cb.addEventListener('change', () => onToggle(a.id!, cb.checked));
+  cb.disabled = typeof a.id !== 'number';
+  cb.addEventListener('change', () => {
+    if (typeof a.id !== 'number') return;
+    onToggle(a.id, cb.checked);
+  });
 
   const time = document.createElement('span');
   time.className = 'entry-time';
@@ -157,6 +161,32 @@ export function buildRequestRow(r: RequestEntry): HTMLDetailsElement {
   }
   d.append(sum, pre1, pre2);
   return d;
+}
+
+export function buildLogRow(log: LogEntry): HTMLDivElement {
+  const row = document.createElement('div');
+  row.className = 'entry entry-log ' + log.level;
+  const time = document.createElement('span');
+  time.className = 'entry-time';
+  time.textContent = fmtClock(log.ts);
+  const line = document.createElement('span');
+  line.className = 'log-line';
+  line.textContent = describeLog(log);
+  row.append(time, line);
+  return row;
+}
+
+export function buildNoteRow(note: ChangeNote): HTMLDivElement {
+  const row = document.createElement('div');
+  row.className = 'entry entry-note';
+  const time = document.createElement('span');
+  time.className = 'entry-time';
+  time.textContent = fmtClock(note.ts);
+  const line = document.createElement('span');
+  line.className = 'note-line';
+  line.textContent = `修改意见 ${describeElement(note)} → ${note.opinion}`;
+  row.append(time, line);
+  return row;
 }
 
 export function buildPiniaRow(ev: PiniaEvent): HTMLDivElement {

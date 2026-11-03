@@ -1,5 +1,7 @@
 // 核心数据模型与消息类型(全插件共用)。
 
+import type { CaptureFlags } from './capture';
+
 export interface ClickPoint {
   x: number;
   y: number;
@@ -86,7 +88,29 @@ export interface LogEntry {
   text: string;
 }
 
+/** 右键记下的修改意见:只保留页面、元素定位、要改成什么 */
+export interface ChangeNote {
+  id?: number;
+  sessionId: string;
+  ts: number;
+  url: string;
+  title?: string;
+  selector: string;
+  label: string;
+  htmlHint: string;
+  vue?: VueInfo | null;
+  opinion: string;
+}
+
 export type SessionStatus = 'recording' | 'stopped' | 'submitted';
+
+/** 一次成功提交到 Redmine 的 issue 链接 */
+export interface IssueLink {
+  issueId: number;
+  issueUrl: string;
+  subject: string;
+  submittedAt: number;
+}
 
 export interface RecorderSession {
   id: string;
@@ -96,12 +120,15 @@ export interface RecorderSession {
   subject: string;
   issueId: number | null;
   issueUrl: string | null;
+  /** 该会话历次提交,最新的在最后 */
+  submissions?: IssueLink[];
 }
 
 export interface RecorderSettings {
   redmineUrl?: string;
   apiKey?: string;
   captureBodies?: boolean;
+  capture?: Partial<CaptureFlags>;
   projectId?: string | number;
   trackerId?: string | number;
   priorityId?: string | number;
@@ -111,6 +138,7 @@ export interface StateInfo {
   recording: boolean;
   sessionId: string | null;
   debuggerFailed?: boolean;
+  capture: CaptureFlags;
 }
 
 export interface SessionSummary extends RecorderSession {
@@ -126,13 +154,16 @@ export interface SessionDetail {
   requests: RequestEntry[];
   logs: LogEntry[];
   pinia: PiniaEvent[];
+  notes: ChangeNote[];
 }
 
-/** 时间线条目:操作 / API / Pinia 统一按 ts 交错 */
+/** 时间线条目:操作 / API / Pinia / Console 统一按 ts 交错 */
 export type TimelineEntry =
   | { type: 'action'; ts: number; data: RecordedAction; ownerStepIdx: number }
   | { type: 'request'; ts: number; data: RequestEntry; ownerStepIdx: number }
-  | { type: 'pinia'; ts: number; data: PiniaEvent; ownerStepIdx: number };
+  | { type: 'pinia'; ts: number; data: PiniaEvent; ownerStepIdx: number }
+  | { type: 'log'; ts: number; data: LogEntry; ownerStepIdx: number }
+  | { type: 'note'; ts: number; data: ChangeNote; ownerStepIdx: number };
 
 /** 页面(大步骤)分组 */
 export interface PageGroup {
@@ -159,6 +190,7 @@ export interface SubmitResult {
   issueId: number | null;
   issueUrl: string | null;
   uploadCount: number;
+  submissions: IssueLink[];
 }
 
 export interface RedmineUser {
@@ -170,6 +202,8 @@ export interface RedmineUser {
 export interface ResultMap {
   REC_ACTION: { recorded: boolean; id?: number };
   REC_PINIA: { recorded: boolean; capped?: boolean };
+  REC_LOG: { recorded: boolean };
+  REC_NOTE: { recorded: boolean };
   START_RECORDING: { ok: boolean; sessionId?: string; already?: boolean };
   STOP_RECORDING: { ok: boolean; sessionId?: string | null };
   GET_STATE: StateInfo;
@@ -181,6 +215,7 @@ export interface ResultMap {
   DELETE_ITEMS: { ok: true; removed: number };
   SETTINGS_GET: RecorderSettings;
   SETTINGS_SET: { ok: true };
+  SET_CAPTURE: CaptureFlags;
   TEST_REDMINE: RedmineUser;
   LIST_PROJECTS: { id: number; name: string; identifier?: string }[];
   LIST_TRACKERS: { id: number; name: string }[];

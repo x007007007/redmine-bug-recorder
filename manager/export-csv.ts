@@ -1,13 +1,13 @@
 // 导出 CSV(Excel 可直接打开):操作 / API / Pinia 按时间交错,截图列含 base64 编码。
 
-import { fmtClock, describeAction, describePiniaEvent, shortUrl, clip } from '../shared/describe';
+import { fmtClock, describeAction, describeElement, describeLog, describePiniaEvent, shortUrl, clip } from '../shared/describe';
 import { buildPages } from '../shared/timeline';
 import type { PageGroup, SessionDetail, TimelineEntry } from '../shared/types';
 
 const HEADERS = ['时间', '大步骤', '类型', '内容', 'Vue组件', '选择器', '值/请求体', '状态/耗时', '页面', '截图base64'];
 
 export function buildCsv(cache: SessionDetail): string {
-  const pages = buildPages(cache.actions, cache.requests, cache.pinia);
+  const pages = buildPages(cache.actions, cache.requests, cache.pinia, cache.logs, cache.notes || []);
   const lines: string[][] = [HEADERS];
   for (const p of pages) {
     const stepNumMap = stepNumbers(p);
@@ -63,6 +63,8 @@ function csvRow(p: PageGroup, e: TimelineEntry, numOf: Map<number, number>): str
       '',
     ];
   }
+  if (e.type === 'log') return [ts, '', 'Console', describeLog(e.data), '', '', '', e.data.level, page, ''];
+  if (e.type === 'note') return [ts, '', '修改意见', `${describeElement(e.data)} → ${e.data.opinion}`, '', e.data.selector, e.data.opinion, '', page, ''];
   return [ts, '', 'Pinia', describePiniaEvent(e.data), '', '', '', '', page, ''];
 }
 

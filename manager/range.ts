@@ -55,8 +55,9 @@ export function applyScope(
       session: full.session,
       actions: full.actions.filter((a) => inRange(a.ts)),
       requests: full.requests.filter((r) => inRange(r.ts)),
-      logs: full.logs,
+      logs: full.logs.filter((l) => inRange(l.ts)),
       pinia: full.pinia.filter((e) => inRange(e.ts)),
+      notes: (full.notes || []).filter((n) => inRange(n.ts)),
     },
     scope: { fromTs, toTs, label },
   };

@@ -4,9 +4,9 @@
 import type { LogEntry, PiniaEvent, RecordedAction, RecorderSession, RequestEntry } from './types';
 
 const DB_NAME = 'bug-recorder';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
-export type StoreName = 'sessions' | 'actions' | 'requests' | 'logs' | 'pinia';
+export type StoreName = 'sessions' | 'actions' | 'requests' | 'logs' | 'pinia' | 'notes';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -30,6 +30,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains('pinia')) {
         db.createObjectStore('pinia', { keyPath: 'id', autoIncrement: true }).createIndex('bySession', 'sessionId');
+      }
+      if (!db.objectStoreNames.contains('notes')) {
+        db.createObjectStore('notes', { keyPath: 'id', autoIncrement: true }).createIndex('bySession', 'sessionId');
       }
     };
     req.onsuccess = () => resolve(req.result);

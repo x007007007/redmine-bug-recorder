@@ -1,5 +1,6 @@
 // 面板共享状态(各视图模块读写同一对象)。
 
+import { SHOW_ALL_CAPTURE, type CaptureView, type ListOrigin } from '../shared/timeline';
 import type { PageGroup, SessionDetail, SessionSummary, SubmitRange } from '../shared/types';
 
 export interface PanelState {
@@ -15,6 +16,11 @@ export interface PanelState {
   rangeMode: boolean;
   rangeFromTs: number | null;
   range: SubmitRange | null;
+  pageSort: 'asc' | 'desc';
+  listOrigin: ListOrigin;
+  captureView: CaptureView;
+  pendingDeleteId: string | null;
+  selectionRev: number;
 }
 
 export const panelState: PanelState = {
@@ -30,6 +36,11 @@ export const panelState: PanelState = {
   rangeMode: false,
   rangeFromTs: null,
   range: null,
+  pageSort: 'asc',
+  listOrigin: 'all',
+  captureView: { ...SHOW_ALL_CAPTURE },
+  pendingDeleteId: null,
+  selectionRev: 0,
 };
 
 export const selectionKey = (sessionId: string): string => `selection:${sessionId}`;

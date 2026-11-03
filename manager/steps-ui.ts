@@ -7,8 +7,10 @@ import {
   buildPages,
   sortPages,
   filterPages,
+  filterVisiblePages,
   computePropsDiffs,
   buildTabLabels,
+  type CaptureView,
 } from '../shared/timeline';
 import { planShotUploads } from '../shared/shots';
 import { buildPageGroup } from './page-ui';
@@ -28,9 +30,16 @@ export function selectedActions(): RecordedAction[] {
 
 function buildPagesFiltered(): PageGroup[] {
   if (!store.cache) return [];
-  return sortPages(
-    filterPages(buildPages(store.cache.actions, store.cache.requests, store.cache.pinia), store.search),
-    store.sortMode
+  return filterVisiblePages(
+    sortPages(
+      filterPages(
+        buildPages(store.cache.actions, store.cache.requests, store.cache.pinia, store.cache.logs, store.cache.notes || []),
+        store.search
+      ),
+      store.sortMode
+    ),
+    store.listOrigin,
+    store.captureView
   );
 }
 
@@ -43,6 +52,8 @@ export function renderAll(): void {
     shots: new Map(planShotUploads(store.cache.actions).map((p) => [p.actionId, p.filename])),
     tabMap: buildTabLabels(store.cache.actions),
     multiTab: buildTabLabels(store.cache.actions).size > 1,
+    listOrigin: store.listOrigin,
+    captureView: store.captureView,
   };
   const handlers = {
     isCollapsed: (p: PageGroup) => store.collapsed.has(p.key),
@@ -54,15 +65,18 @@ export function renderAll(): void {
     },
     onTogglePage: (p: PageGroup, checked: boolean) => {
       for (const a of p.actions) {
-        if (checked) store.selected.add(a.id!);
-        else store.selected.delete(a.id!);
+        if (typeof a.id !== 'number') continue;
+        if (checked) store.selected.add(a.id);
+        else store.selected.delete(a.id);
       }
       renderAll();
       onSelectionChanged();
     },
     onToggleAction: (id: number, checked: boolean) => {
+      if (typeof id !== 'number') return;
       if (checked) store.selected.add(id);
       else store.selected.delete(id);
+      renderAll();
       onSelectionChanged();
     },
     onDeleteAction: (a: RecordedAction) => void deleteAction(a),
@@ -80,7 +94,11 @@ export function renderAll(): void {
       $('lightbox').hidden = false;
     },
   };
-  for (const p of buildPagesFiltered()) {
+  const pages = buildPagesFiltered();
+  if (!pages.length) {
+    box.innerHTML = '<div class="empty">当前过滤下没有条目</div>';
+  }
+  for (const p of pages) {
     box.appendChild(buildPageGroup(p, ctx, handlers));
   }
   syncSelAll();
@@ -98,9 +116,12 @@ function syncSelAll(): void {
 }
 
 function updateSelInfo(): void {
-  $('selInfo').textContent = store.cache
+  const text = store.cache
     ? `已选 ${store.selected.size} / ${store.cache.actions.length} 步(未选步骤不会进入描述与截图附件)`
     : '';
+  $('selInfo').textContent = text;
+  const dock = document.getElementById('dockSel');
+  if (dock) dock.textContent = store.cache ? `已选 ${store.selected.size} 步` : '';
 }
 
 /* ---------- 删除 ---------- */
@@ -153,12 +174,27 @@ async function deletePage(p: PageGroup): Promise<void> {
 export function initToolbar(): void {
   $('selAll').addEventListener('change', () => {
     if (!store.cache) return;
-    store.selected = new Set(($('selAll') as HTMLInputElement).checked ? store.cache.actions.map((a) => a.id!) : []);
+    store.selected = new Set(
+      ($('selAll') as HTMLInputElement).checked
+        ? store.cache.actions.map((a) => a.id).filter((id): id is number => typeof id === 'number')
+        : []
+    );
     renderAll();
     onSelectionChanged();
   });
   $('searchBox').addEventListener('input', () => {
     store.search = ($('searchBox') as HTMLInputElement).value;
+    renderAll();
+  });
+  $('listOrigin').addEventListener('change', () => {
+    store.listOrigin = ($('listOrigin') as HTMLSelectElement).value as 'all' | 'human' | 'event';
+    renderAll();
+  });
+  $('viewFilters').addEventListener('change', (ev) => {
+    const input = ev.target;
+    if (!(input instanceof HTMLInputElement) || !input.dataset.view) return;
+    const key = input.dataset.view as keyof CaptureView;
+    store.captureView = { ...store.captureView, [key]: input.checked };
     renderAll();
   });
   $('sortMode').addEventListener('change', () => {

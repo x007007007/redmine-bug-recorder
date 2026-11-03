@@ -2,6 +2,7 @@
 // 经 CustomEvent 向主世界探针请求 Vue/Pinia 信息后一并发给后台。
 // 值不脱敏(提交前由测试人员 review),仅做长度截断。构建时打包为单个 IIFE 经典脚本。
 
+import { drainQueue, readVue } from './bridge';
 import { truncate, textOf, fieldLabel, cssPath } from './dom-meta';
 import { captureFlags, watchCaptureFlags } from './capture-flags';
 import { installNoteCapture } from './note-ui';
@@ -32,8 +33,8 @@ function install(): void {
     if (!el || !el.setAttribute) return null;
     const id = 'v' + ++probeSeq;
     let info: VueInfo | null = null;
-    const onInfo = (e: Event): void => {
-      info = (e as CustomEvent<VueInfo>).detail || null;
+    const onInfo = (): void => {
+      info = readVue<VueInfo>();
     };
     try {
       el.setAttribute('data-bugrec-eid', id);
@@ -42,10 +43,22 @@ function install(): void {
       document.addEventListener('bugrec:vue-info', onInfo, { once: true });
       document.dispatchEvent(new CustomEvent('bugrec:probe', { detail: { id } }));
       document.removeEventListener('bugrec:vue-info', onInfo);
+      if (!info) info = readVue<VueInfo>();
     } catch {
       /* 探针不可用时静默降级 */
     }
     return info;
+  }
+
+  function isOwnUi(ev: Event): boolean {
+    const nodes = typeof ev.composedPath === 'function' ? ev.composedPath() : [];
+    for (const node of nodes) {
+      if (!(node instanceof Element)) continue;
+      if (node.id === 'bugrec-note-host' || node.id === 'bugrec-bridge') return true;
+    }
+    const target = ev.target;
+    if (!(target instanceof Element)) return false;
+    return target.id === 'bugrec-note-host' || target.id === 'bugrec-bridge' || !!target.closest('#bugrec-note-host, #bugrec-bridge');
   }
 
   function send(action: Partial<RecordedAction>): void {
@@ -65,7 +78,7 @@ function install(): void {
   document.addEventListener(
     'click',
     (e) => {
-      if (!captureFlags().isClickEnabled) return;
+      if (!captureFlags().isClickEnabled || isOwnUi(e)) return;
       if (!(e.target instanceof Element)) return;
       const el = e.target.closest(INTERACTIVE) || e.target;
       const action: Partial<RecordedAction> = Object.assign({ kind: 'click' as const }, baseMeta(el));
@@ -103,7 +116,7 @@ function install(): void {
   document.addEventListener(
     'input',
     (e) => {
-      if (!captureFlags().isKeyboardEnabled) return;
+      if (!captureFlags().isKeyboardEnabled || isOwnUi(e)) return;
       const el = e.target;
       if (!(el instanceof HTMLElement) || !el.matches(TEXT_INPUT)) return;
       const t = pending.get(el);
@@ -135,7 +148,7 @@ function install(): void {
   document.addEventListener(
     'keydown',
     (e) => {
-      if (!captureFlags().isKeyboardEnabled) return;
+      if (!captureFlags().isKeyboardEnabled || isOwnUi(e)) return;
       const el = e.target;
       if (!(el instanceof Element) || !el.matches('input,textarea')) return;
       if (e.key === 'Enter' || e.key === 'Escape') {
@@ -150,6 +163,7 @@ function install(): void {
   document.addEventListener(
     'change',
     (e) => {
+      if (isOwnUi(e)) return;
       const el = e.target;
       if (!(el instanceof HTMLSelectElement)) return;
       const opt = el.selectedOptions && el.selectedOptions[0];
@@ -167,6 +181,7 @@ function install(): void {
   document.addEventListener(
     'submit',
     (e) => {
+      if (isOwnUi(e)) return;
       const form = e.target;
       if (!(form instanceof Element)) return;
       const fields: string[] = [];
@@ -183,30 +198,30 @@ function install(): void {
     true
   );
 
-  /* 主世界 Pinia 变更流 → 后台(按 ts 关联到步骤) */
-  document.addEventListener('bugrec:console', (e) => {
-    if (!captureFlags().isConsoleEnabled) return;
-    const detail = (e as CustomEvent<{ level?: string; text?: string }>).detail;
-    if (!detail || !detail.text) return;
-    try {
-      const p = chrome.runtime.sendMessage({ type: 'REC_LOG', level: detail.level, text: detail.text });
-      if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {});
-    } catch {
-      /* ignore */
-    }
-  });
-
   installNoteCapture((el) => (captureFlags().isVueEnabled ? collectVueInfo(el) : null));
 
-  document.addEventListener('bugrec:pinia', (e) => {
-    if (!captureFlags().isVueEnabled) return;
-    try {
-      const p = chrome.runtime.sendMessage({ type: 'REC_PINIA', event: (e as CustomEvent).detail });
-      if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {});
-    } catch {
-      /* ignore */
+  const flushBridge = (): void => {
+    type BridgeItem =
+      | { channel: 'console'; level?: string; text?: string }
+      | { channel: 'pinia'; event?: Record<string, unknown> };
+    for (const item of drainQueue<BridgeItem>()) {
+      try {
+        if (item.channel === 'console') {
+          if (!captureFlags().isConsoleEnabled || !item.text) continue;
+          const p = chrome.runtime.sendMessage({ type: 'REC_LOG', level: item.level, text: item.text });
+          if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {});
+        } else if (item.channel === 'pinia') {
+          if (!captureFlags().isVueEnabled || !item.event) continue;
+          const p = chrome.runtime.sendMessage({ type: 'REC_PINIA', event: item.event });
+          if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {});
+        }
+      } catch {
+        /* 扩展重载后旧页面发送失败 */
+      }
     }
-  });
+  };
+  document.addEventListener('bugrec:bridge', flushBridge);
+  flushBridge();
 }
 
 install();

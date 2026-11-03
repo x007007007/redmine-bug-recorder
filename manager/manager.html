@@ -7,9 +7,10 @@
 </head>
 <body>
   <header>
-    <h1>🐞 Bug Recorder <small>for Redmine</small></h1>
+    <h1>🐞 Bug Recorder <small>for Redmine</small> <span id="extVer"></span></h1>
     <span class="chip" id="recChip"><span class="dot" id="dot"></span><span id="recText">未录制</span></span>
     <button id="btnToggleRec" class="primary">● 开始录制</button>
+    <div id="captureBar" class="capture-bar"></div>
     <span id="err" class="err" hidden></span>
   </header>
 
@@ -24,7 +25,7 @@
       </label>
       <label class="chk">
         <input id="setBodies" type="checkbox" />
-        捕获 API 请求/响应体与 Console(仅 Chrome;浏览器顶部会出现"正在调试"横幅,属正常现象)
+        捕获 API 响应体(需同时打开上方「请求」;仅 Chrome,浏览器顶部会出现"正在调试"横幅)
       </label>
       <div class="row">
         <button id="btnSaveSettings">保存设置</button>
@@ -37,7 +38,7 @@
   <main>
     <aside>
       <div class="aside-head">
-        <h2>录制会话</h2>
+        <h2>会话列表</h2>
         <button id="btnRefresh" class="ghost" title="刷新列表">⟳</button>
       </div>
       <div id="sessions"></div>
@@ -54,56 +55,75 @@
         <div class="meta" id="detailMeta"></div>
         <div class="meta" id="scopeInfo"></div>
 
-        <h3>操作时间线(URL 为大步骤 · 操作/API/Pinia 按时间交错 · 勾选要提交的步骤)</h3>
+        <h3>操作时间线(URL 为大步骤 · 操作/API/Console/Pinia 按时间交错 · 勾选要提交的步骤)</h3>
         <div class="row wrap steps-toolbar">
           <label class="chk"><input id="selAll" type="checkbox" checked /> 全选步骤</label>
           <span class="count" id="selInfo"></span>
           <input id="searchBox" placeholder="搜索过滤大步骤(URL / 标题 / 步骤内容 / API 路径)" />
+          <select id="listOrigin" title="区分人填写的修改意见和自动记录的事件">
+            <option value="all">全部</option>
+            <option value="human">人填写的</option>
+            <option value="event">事件记录</option>
+          </select>
           <select id="sortMode" title="大步骤排序(不改变页面内部顺序)">
             <option value="desc">最新页面在前</option>
             <option value="asc">最早页面在前</option>
           </select>
           <button type="button" id="btnCollapseAll" class="ghost">折叠/展开全部</button>
+          <span class="view-filters" id="viewFilters">
+            <label class="chk"><input type="checkbox" data-view="isClickShown" checked /> 点击</label>
+            <label class="chk"><input type="checkbox" data-view="isKeyboardShown" checked /> 键盘</label>
+            <label class="chk"><input type="checkbox" data-view="isShotShown" checked /> 截图</label>
+            <label class="chk"><input type="checkbox" data-view="isVueShown" checked /> Vue</label>
+            <label class="chk"><input type="checkbox" data-view="isConsoleShown" checked /> Console</label>
+            <label class="chk"><input type="checkbox" data-view="isRequestShown" checked /> 请求</label>
+          </span>
         </div>
         <div id="steps"></div>
-
-        <h3>提交 Bug 到 Redmine</h3>
-        <form id="bugForm">
-          <label>主题
-            <input id="bugSubject" required placeholder="一句话描述 Bug" />
-          </label>
-          <div class="row wrap">
-            <label>项目
-              <span class="inline"><select id="bugProject"></select><button type="button" id="btnLoadProjects" class="ghost">载入</button></span>
-            </label>
-            <label>跟踪
-              <select id="bugTracker"><option value="">(默认)</option></select>
-            </label>
-            <label>优先级
-              <select id="bugPriority"><option value="">(默认)</option></select>
-            </label>
-            <label>或手动填项目标识 / ID
-              <input id="bugProjectManual" placeholder="如 my-project 或 12(填了则优先于上方选择)" style="width:220px" />
-            </label>
-          </div>
-          <label>描述(请 review:输入值原样记录,提交前可编辑;Markdown 格式)
-            <textarea id="bugDescription" rows="14" spellcheck="false"></textarea>
-          </label>
-          <div class="row wrap">
-            <label class="chk"><input id="bugAttach" type="checkbox" checked /> 附加每步截图</label>
-            <label>最多附加截图
-              <span class="inline"><input id="bugShotMax" type="number" value="20" min="0" style="width:70px" /> 张(超出取最近)</span>
-            </label>
-            <button type="button" id="btnRegen">重新生成描述</button>
-            <button type="button" id="btnCopyDesc">复制描述</button>
-            <button type="button" id="btnExportCsv">导出 CSV(含截图base64)</button>
-            <button type="submit" id="btnSubmit" class="primary">🚀 提交到 Redmine</button>
-          </div>
-          <div id="submitResult"></div>
-        </form>
       </div>
     </section>
   </main>
+
+  <aside id="submitDock" hidden>
+    <div id="issueLinks" class="issue-links" hidden></div>
+    <div class="dock-head">
+      <b>提交 Bug</b>
+      <span id="dockSel"></span>
+      <button type="button" id="btnRegen">按已选步骤生成描述</button>
+    </div>
+    <form id="bugForm">
+      <label>主题
+        <input id="bugSubject" required placeholder="一句话描述 Bug" />
+      </label>
+      <div class="row wrap">
+        <label>项目
+          <span class="inline"><select id="bugProject"></select><button type="button" id="btnLoadProjects" class="ghost">载入</button></span>
+        </label>
+        <label>跟踪
+          <select id="bugTracker"><option value="">(默认)</option></select>
+        </label>
+        <label>优先级
+          <select id="bugPriority"><option value="">(默认)</option></select>
+        </label>
+        <label>或手动填项目标识 / ID
+          <input id="bugProjectManual" placeholder="如 my-project 或 12" />
+        </label>
+      </div>
+      <label>描述(按当前勾选的步骤生成,可再编辑)
+        <textarea id="bugDescription" rows="8" spellcheck="false"></textarea>
+      </label>
+      <div class="row wrap">
+        <label class="chk"><input id="bugAttach" type="checkbox" checked /> 附加每步截图</label>
+        <label>最多截图
+          <span class="inline"><input id="bugShotMax" type="number" value="20" min="0" style="width:64px" /> 张</span>
+        </label>
+        <button type="button" id="btnCopyDesc">复制描述</button>
+        <button type="button" id="btnExportCsv">导出 CSV</button>
+        <button type="submit" id="btnSubmit" class="primary">🚀 提交到 Redmine</button>
+      </div>
+      <div id="submitResult"></div>
+    </form>
+  </aside>
 
   <div id="lightbox" hidden>
     <div class="lightbox-inner">

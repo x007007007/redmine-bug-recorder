@@ -5,8 +5,9 @@
   <style>
     :root { --accent: #d93025; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { width: 280px; font: 13px/1.5 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 14px; background: #fff; color: #202124; }
+    body { width: 320px; font: 13px/1.5 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 14px; background: #fff; color: #202124; }
     h1 { font-size: 14px; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+    #extVer { margin-left: auto; color: #80868b; font-size: 11px; font-weight: 500; }
     .dot { width: 9px; height: 9px; border-radius: 50%; background: #9aa0a6; display: inline-block; }
     .dot.on { background: var(--accent); animation: blink 1s infinite; }
     @keyframes blink { 50% { opacity: 0.35; } }
@@ -16,18 +17,32 @@
     #btnToggle { background: var(--accent); color: #fff; font-weight: 600; }
     #btnToggle.stop { background: #5f6368; }
     #btnManager { background: #e8eaed; color: #202124; margin-top: 8px; }
+    .capture-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0; font-size: 12px; }
+    .capture-bar .cap-label { color: #5f6368; font-weight: 600; }
+    .capture-bar .chk { display: flex; align-items: center; gap: 3px; cursor: pointer; }
+    .sessions-head { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: #5f6368; }
+    #sessionList { max-height: 140px; overflow-y: auto; margin-top: 4px; border: 1px solid #e0e3e7; border-radius: 8px; }
+    .session-item { padding: 6px 8px; border-top: 1px solid #e0e3e7; cursor: pointer; font-size: 12px; }
+    .session-item:first-child { border-top: none; }
+    .session-item:hover { background: #f6f7f9; }
+    .session-item .m { color: #5f6368; }
+    .session-item .live { color: var(--accent); font-weight: 700; }
+    #sessionList .empty { color: #80868b; padding: 8px; font-size: 12px; }
     .hint { margin-top: 10px; font-size: 11px; color: #80868b; }
     .err { color: var(--accent); font-size: 12px; margin-top: 8px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h1>🐞 Bug Recorder</h1>
+  <h1>🐞 Bug Recorder <span id="extVer"></span></h1>
   <div id="status"><span class="dot" id="dot"></span><span id="stateText">未录制</span></div>
   <div id="stats">—</div>
   <button id="btnToggle">● 开始录制</button>
+  <div id="captureBar" class="capture-bar"></div>
+  <div class="sessions-head"><b>会话列表</b></div>
+  <div id="sessionList"><div class="empty">正在加载会话列表…</div></div>
   <button id="btnManager">打开管理页(提交 Bug / 设置)</button>
   <div class="err" id="err" hidden></div>
-  <div class="hint">录制中,页面上的点击 / 输入会按步骤记录,每步自动截图;API 交互一并捕获。</div>
+  <div class="hint">录制旁边的开关可随时关闭点击、截图、键盘、Vue、Console 或请求。Console 会记下错误、警告和未捕获异常。</div>
   <script src="popup.js" type="module"></script>
 </body>
 </html>

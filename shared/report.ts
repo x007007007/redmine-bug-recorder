@@ -1,10 +1,10 @@
 // Redmine issue 描述生成:按页面(大步骤)分组,页面内操作与 API/Pinia 事件按时间线交错。
 // 描述始终按时间正序排列(复现步骤必须按先后),UI 中的排序/过滤只影响视图。
 
-import { fmtTime, fmtClock, clip, shortUrl, describeAction, describePiniaEvent } from './describe';
+import { fmtTime, fmtClock, clip, shortUrl, describeAction, describeElement, describeLog, describePiniaEvent } from './describe';
 import { buildPages, computePropsDiffs } from './timeline';
 import { planShotUploads } from './shots';
-import type { LogEntry, PiniaEvent, RecordedAction, RequestEntry, RecorderSession } from './types';
+import type { ChangeNote, LogEntry, PiniaEvent, RecordedAction, RequestEntry, RecorderSession } from './types';
 
 export interface ReportEnv {
   userAgent?: string;
@@ -14,6 +14,7 @@ export interface ReportEnv {
 export interface ReportOpts {
   piniaEvents?: PiniaEvent[];
   shotLimit?: number;
+  notes?: ChangeNote[];
 }
 
 export function buildDescription(
@@ -24,14 +25,14 @@ export function buildDescription(
   env: ReportEnv = {},
   opts: ReportOpts = {}
 ): string {
-  const { piniaEvents = [], shotLimit = 0 } = opts;
+  const { piniaEvents = [], shotLimit = 0, notes = [] } = opts;
   const { userAgent, lastUrl } = env;
   const lines: string[] = [];
   const shots = new Map(planShotUploads(actions, shotLimit).map((p) => [p.actionId, p.filename]));
   const propsDiffs = computePropsDiffs(actions);
-  const pages = buildPages(actions, requests, piniaEvents);
+  const pages = buildPages(actions, requests, piniaEvents, logs);
 
-  lines.push('## 复现步骤');
+  lines.push('## 操作步骤');
   lines.push('');
   if (!actions.length) lines.push('(未记录到操作步骤)');
 
@@ -67,6 +68,11 @@ export function buildDescription(
   }
 
   lines.push('');
+  lines.push('## 修改意见');
+  lines.push('');
+  appendNotes(lines, notes);
+
+  lines.push('');
   lines.push('## 环境信息');
   lines.push('');
   lines.push(`- 记录时间: ${fmtTime(session.startedAt)}${session.endedAt ? ` ~ ${fmtTime(session.endedAt)}` : ''}`);
@@ -87,6 +93,7 @@ function entryLine(e: { type: string; data: unknown }): string {
     const flag = !r.error && r.status && r.status >= 400 ? ' ⚠️' : '';
     return `API \`${r.method} ${shortUrl(r.url)}\` → ${status}${dur}${flag}`;
   }
+  if (e.type === 'log') return describeLog(e.data as LogEntry);
   return `Pinia: ${describePiniaEvent(e.data as PiniaEvent)}`;
 }
 
@@ -110,6 +117,29 @@ function appendVueLines(lines: string[], a: RecordedAction, propsDiffs: Map<numb
     for (const ch of a.vue.piniaChanges.filter((c) => !c.firstSeen)) {
       lines.push(`   - Pinia store \`${ch.storeId}\` 状态变化,当前值: \`${clip(ch.state, 600)}\``);
     }
+  }
+}
+
+function appendNotes(lines: string[], notes: ChangeNote[]): void {
+  if (!notes.length) {
+    lines.push('(本次没有修改意见)');
+    lines.push('');
+    return;
+  }
+  const byUrl = new Map<string, ChangeNote[]>();
+  for (const note of notes) {
+    const list = byUrl.get(note.url) ?? [];
+    list.push(note);
+    byUrl.set(note.url, list);
+  }
+  for (const [url, list] of byUrl) {
+    const title = list[0]?.title ? ` (${list[0].title})` : '';
+    lines.push(`### ${url}${title}`);
+    for (const note of list) {
+      lines.push(`- 元素: ${describeElement(note)}`);
+      lines.push(`  - 改为: ${clip(note.opinion, 400)}`);
+    }
+    lines.push('');
   }
 }
 
