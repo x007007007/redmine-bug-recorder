@@ -52,6 +52,7 @@ jobs:
           pkg=$(node -p "require('./package.json').version")
           test "$ver" = "$ff" && test "$ver" = "$pkg"
           tag="v${ver}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           set +e
           meta=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '[.object.type, .object.sha] | @tsv' 2>/tmp/tag-err.txt)
           status=$?
@@ -65,6 +66,7 @@ jobs:
               -f ref="refs/tags/${tag}" \
               -f sha="$GITHUB_SHA"
             echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "target=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
             echo "已创建 ${tag}"
             exit 0
           fi
@@ -73,12 +75,18 @@ jobs:
           if [ "$type" = "tag" ]; then
             sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${sha}" --jq .object.sha)
           fi
-          if [ "$sha" = "$GITHUB_SHA" ]; then
+          echo "target=${sha}" >> "$GITHUB_OUTPUT"
+          release_code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "User-Agent: redmine-bug-recorder" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${tag}")
+          if [ "$sha" = "$GITHUB_SHA" ] || [ "$release_code" = "404" ]; then
             echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "${tag} 已指向本次提交"
+            echo "${tag} 指向 ${sha}，Release HTTP ${release_code}"
           else
             echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "${tag} 已指向 ${sha}，已发布的 tag 不移动。要发新版本请先递增 manifest 版本号。"
+            echo "${tag} 已指向 ${sha} 且 Release 已存在，不移动 tag，也不覆盖安装包。"
           fi
 
       - name: 上传安装包到 GitHub Release
@@ -87,10 +95,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes="安装包由 GitHub Actions 构建。不可商用，商业使用需先联系作者取得书面授权。"
-          gh release delete "$GITHUB_REF_NAME" --yes > /tmp/gh-delete.txt 2>&1 || true
-          if ! gh release create "$GITHUB_REF_NAME" release/* \
-            --target "$GITHUB_SHA" \
-            --title "$GITHUB_REF_NAME" \
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            rel="${{ steps.version_tag.outputs.tag }}"
+            target="${{ steps.version_tag.outputs.target }}"
+            # 分支名不是版本号。清掉曾经误建的 main Release / tag，避免和 vX.Y.Z 并列。
+            gh release delete main --yes --cleanup-tag > /tmp/gh-delete-main.txt 2>&1 || true
+          else
+            rel="$GITHUB_REF_NAME"
+            target="$GITHUB_SHA"
+          fi
+          test -n "$rel"
+          test -n "$target"
+          gh release delete "$rel" --yes > /tmp/gh-delete.txt 2>&1 || true
+          if ! gh release create "$rel" release/* \
+            --target "$target" \
+            --title "$rel" \
             --notes "$notes" \
             --latest > /tmp/gh-create.txt 2>&1; then
             {
@@ -105,7 +124,7 @@ jobs:
           code=$(curl -sS -o /tmp/public-release.json -w '%{http_code}' \
             -H "Accept: application/vnd.github+json" \
             -H "User-Agent: redmine-bug-recorder" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}")
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${rel}")
           {
             echo "public_release_http=${code}"
             jq -r '[.tag_name, (.assets // [] | map(.name) | join(","))] | @tsv' /tmp/public-release.json
