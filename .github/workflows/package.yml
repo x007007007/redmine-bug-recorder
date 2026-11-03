@@ -48,8 +48,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes="安装包由 GitHub Actions 构建。正式版本发布在 GitLab Release。不可商用，商业使用需先联系作者取得书面授权。"
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" release/* --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" release/* --title "$GITHUB_REF_NAME" --notes "$notes"
+          gh release delete "$GITHUB_REF_NAME" --yes > /tmp/gh-delete.txt 2>&1 || true
+          if ! gh release create "$GITHUB_REF_NAME" release/* \
+            --target "$GITHUB_SHA" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "$notes" \
+            --latest > /tmp/gh-create.txt 2>&1; then
+            {
+              echo '## gh release create 失败'
+              echo '```'
+              cat /tmp/gh-delete.txt /tmp/gh-create.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
+          cat /tmp/gh-create.txt >> "$GITHUB_STEP_SUMMARY"
+          code=$(curl -sS -o /tmp/public-release.json -w '%{http_code}' \
+            -H "Accept: application/vnd.github+json" \
+            -H "User-Agent: redmine-bug-recorder" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}")
+          {
+            echo "public_release_http=${code}"
+            jq -r '[.tag_name, (.assets // [] | map(.name) | join(","))] | @tsv' /tmp/public-release.json
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$code" = "200"
