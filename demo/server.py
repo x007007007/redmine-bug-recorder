@@ -119,7 +119,8 @@ class FakeRedmineHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(n)
-        if self.path.startswith("/uploads.json"):
+        path_only = self.path.split("?", 1)[0]
+        if path_only in ("/uploads.json", "/uploads"):
             if not self._authed():
                 return
             # filename 参数

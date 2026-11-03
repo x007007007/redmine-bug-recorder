@@ -4,7 +4,7 @@
 
 许可:**不可商用**。个人学习、教学、研究和非营利使用可以;商业使用必须先邮件联系作者取得书面授权:`x007007007@hotmail.com`。全文见 [LICENSE](LICENSE)。
 
-版本发布用 git tag `vX.Y.Z`(与 manifest 版本一致)。GitHub Actions 打包,正式发布页是 GitLab Release。步骤见 [PUBLISHING.md](PUBLISHING.md)。
+版本发布用 git tag `vX.Y.Z`(与 manifest 版本一致)。推送到 GitHub 后,由 GitHub Actions 打包并发布到 GitHub Release。步骤见 [PUBLISHING.md](PUBLISHING.md)。
 
 ## 功能
 
@@ -22,9 +22,9 @@
 - **提交范围**:默认只取**最近 100 步**;DevTools 面板可在时间轴上框选区间,提交页按区间裁剪(可"查看全部 / 恢复默认")
 - **截图限量**:提交时"最多附加截图 N 张"(超出取最近),避免 issue 附件爆炸
 - **点击标记**:点击类操作记录视口坐标;截图缩略图/大图/上传件上叠加半透明点击标记(上传件用 OffscreenCanvas 烙入 PNG 透明通道)
-- **CSV 导出**:操作/API/Pinia 按时间交错导出 CSV(Excel 可开),截图列含 base64
+- **CSV**:操作/API/Pinia 按时间交错导出 CSV(Excel 可开),截图列含 base64;提交时可勾选「附加 CSV」,把同一份文件作为 Redmine 附件
 - **DevTools 面板**(类似 Vue Devtools):**会话列表**(切换查看 / ✕ 删除历史会话)、时间轴缩略图条(点击定位大步骤)、大步骤分页列表、**大步骤 checkbox 勾选**(整页步骤+截图纳入提交,与提交页经 storage 实时双向同步)、选范围一键去提交
-- **一键提交 Redmine**:`POST /uploads.json` → `POST /issues.json`;项目支持列表选择或**手动填项目标识/ID**(列表为空时仍可提交)
+- **一键提交 Redmine**:先 `POST /uploads.json`(404 时再试 `/uploads`)拿 token,再 `POST /issues.json`;截图与 CSV 都是可选项。项目支持列表选择或**手动填项目标识/ID**(列表为空时仍可提交)
 
 ## 安装
 
@@ -63,7 +63,7 @@ npm run smoke      # 端到端冒烟(40 项断言,需先 build 并启动 demo �
 
 管理页(工具栏图标 → 「打开管理页」)→ ⚙️ 设置:
 
-- **Redmine 地址**:如 `https://redmine.example.com`
+- **Redmine 地址**:站点根地址,如 `https://redmine.example.com`。不要粘贴带 `/projects/...` 或 `/issues/...` 的页面地址,否则附件接口会 404
 - **API Key**:Redmine →「我的账号」页面右侧「API 访问键」
 - **捕获 API 请求/响应体**:勾选后经 chrome.debugger 捕获(浏览器顶部会出现"正在调试此浏览器"横幅,属正常;取消横幅则自动降级为仅记录请求元数据)
 
@@ -77,7 +77,7 @@ npm run smoke      # 端到端冒烟(40 项断言,需先 build 并启动 demo �
    - 左侧选择会话;默认只加载最近 100 步,可"查看全部"
    - **勾选**相关步骤(描述实时联动)、可删除无关步骤
    - **review 描述**(输入值原样记录,可编辑;Markdown)
-   - 选择项目(或手动填项目标识)→ **「提交到 Redmine」**,截图按 `step-NN.jpg/png` 附件上传(限量可调)
+   - 选择项目(或手动填项目标识)→ 按需勾选「附加每步截图」「附加 CSV」→ **「提交到 Redmine」**。截图按 `step-NN.jpg/png` 上传(限量可调);CSV 只含已勾选步骤
 
 DevTools 面板(F12 → 「Bug Recorder」):顶部为**会话列表**(点击切换查看,✕ 删除;录制中的会话带 LIVE 标记);时间轴按时间排列每步截图,点击定位大步骤;大步骤行首有 **checkbox**,勾选即把该页全部步骤(含截图)纳入提交,与提交页勾选状态实时双向同步(行内显示"已选 x/y");勾选"选范围"后依次点击两张截图成区间 → 「按此范围去提交」自动打开提交页并裁剪。大步骤多时列表自动分页(每页 5 个)。
 

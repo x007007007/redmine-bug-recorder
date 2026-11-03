@@ -40,13 +40,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # 正式版本页在 GitLab Release。这里的 GitHub Release 只给内网 GitLab 拉取安装包。
       - name: 上传安装包到 GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes="安装包由 GitHub Actions 构建。正式版本发布在 GitLab Release。不可商用，商业使用需先联系作者取得书面授权。"
+          notes="安装包由 GitHub Actions 构建。不可商用，商业使用需先联系作者取得书面授权。"
           gh release delete "$GITHUB_REF_NAME" --yes > /tmp/gh-delete.txt 2>&1 || true
           if ! gh release create "$GITHUB_REF_NAME" release/* \
             --target "$GITHUB_SHA" \

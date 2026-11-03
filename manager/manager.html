@@ -5,7 +5,7 @@
   <title>Bug Recorder for Redmine</title>
   <link rel="stylesheet" href="manager.css" />
 </head>
-<body>
+<body data-dock-side="right" data-dock-collapsed="1">
   <header>
     <h1>🐞 Bug Recorder <small>for Redmine</small> <span id="extVer"></span></h1>
     <span class="chip" id="recChip"><span class="dot" id="dot"></span><span id="recText">未录制</span></span>
@@ -18,7 +18,7 @@
     <summary>⚙️ 设置(Redmine 连接与捕获选项)</summary>
     <div class="settings-grid">
       <label>Redmine 地址
-        <input id="setUrl" placeholder="https://redmine.example.com" />
+        <input id="setUrl" placeholder="https://redmine.example.com（站点根地址，不要带 /projects 或 /issues）" />
       </label>
       <label>API Key(我的账号 页面可查看)
         <input id="setKey" type="password" placeholder="在 Redmine「我的账号」底部获取" />
@@ -35,8 +35,8 @@
     </div>
   </details>
 
-  <main>
-    <aside>
+  <main id="workspace">
+    <aside id="sessionAside">
       <div class="aside-head">
         <h2>会话列表</h2>
         <button id="btnRefresh" class="ghost" title="刷新列表">⟳</button>
@@ -54,6 +54,7 @@
         </div>
         <div class="meta" id="detailMeta"></div>
         <div class="meta" id="scopeInfo"></div>
+        <div id="issueHistory" class="issue-history" hidden></div>
 
         <h3>操作时间线(URL 为大步骤 · 操作/API/Console/Pinia 按时间交错 · 勾选要提交的步骤)</h3>
         <div class="row wrap steps-toolbar">
@@ -82,13 +83,18 @@
         <div id="steps"></div>
       </div>
     </section>
-  </main>
 
-  <aside id="submitDock" hidden>
-    <div id="issueLinks" class="issue-links" hidden></div>
+    <aside id="submitDock" hidden>
+      <div class="dock-rail">
+        <button type="button" id="btnDockExpand" title="展开提交框">提交 Bug</button>
+        <button type="button" id="btnDockSideRail" class="ghost" title="换到另一侧">⇄</button>
+      </div>
+      <div class="dock-body">
     <div class="dock-head">
       <b>提交 Bug</b>
       <span id="dockSel"></span>
+      <button type="button" id="btnDockSide" class="ghost" title="换到另一侧">⇄</button>
+      <button type="button" id="btnDockCollapse" class="ghost">收起</button>
       <button type="button" id="btnRegen">按已选步骤生成描述</button>
     </div>
     <form id="bugForm">
@@ -114,6 +120,7 @@
       </label>
       <div class="row wrap">
         <label class="chk"><input id="bugAttach" type="checkbox" checked /> 附加每步截图</label>
+        <label class="chk"><input id="bugAttachCsv" type="checkbox" /> 附加 CSV</label>
         <label>最多截图
           <span class="inline"><input id="bugShotMax" type="number" value="20" min="0" style="width:64px" /> 张</span>
         </label>
@@ -121,9 +128,12 @@
         <button type="button" id="btnExportCsv">导出 CSV</button>
         <button type="submit" id="btnSubmit" class="primary">🚀 提交到 Redmine</button>
       </div>
+      <div id="updateHint" hidden></div>
       <div id="submitResult"></div>
     </form>
-  </aside>
+      </div>
+    </aside>
+  </main>
 
   <div id="lightbox" hidden>
     <div class="lightbox-inner">

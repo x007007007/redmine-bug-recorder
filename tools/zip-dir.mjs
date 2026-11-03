@@ -1,4 +1,4 @@
-// 把目录打成 zip(存储、不压缩)。不依赖系统 zip,GitLab 的 node 镜像可以直接用。
+// 把目录打成 zip(存储、不压缩)。不依赖系统 zip,CI 的 node 镜像可以直接用。
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 

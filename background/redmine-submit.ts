@@ -1,6 +1,7 @@
 // Redmine 相关的 background 端点:连接测试/下拉数据 + 提交 issue。
 // 截图:有点击坐标的在原截图上烙入半透明点击标记(PNG,透明通道),数量受 shotLimit 限制(取最近 N 张)。
 
+import { buildCsv } from '../manager/export-csv';
 import {
   testConnection,
   listProjects,
@@ -8,13 +9,16 @@ import {
   listPriorities,
   uploadAttachment,
   createIssue,
+  updateIssue,
   dataUrlToBytes,
+  normalizeBase,
 } from '../shared/redmine';
 import { planShotUploads } from '../shared/shots';
-import { dbPut, dbGet } from '../shared/db';
+import { ownedBySelection } from '../shared/timeline';
+import { dbPut } from '../shared/db';
 import { getSettings, notifySessionUpdated } from './state';
 import { getSession } from './sessions';
-import type { IssueLink, RecordedAction, RecorderSession, RecorderSettings, SubmitResult } from '../shared/types';
+import type { IssueLink, RecordedAction, RecorderSession, RecorderSettings, SessionDetail, SubmitResult } from '../shared/types';
 
 export const redmineEndpoints: Record<
   string,
@@ -34,52 +38,38 @@ export async function submitRedmine(msg: {
   trackerId?: string | number;
   priorityId?: string | number;
   attachScreenshots?: boolean;
+  attachCsv?: boolean;
   shotLimit?: number;
   selectedActionIds?: number[];
+  issueId?: number | null;
 }): Promise<SubmitResult> {
   const settings = await getSettings();
-  const { actions: allActions } = await getSession(msg.sessionId);
-  const session = await dbGet<RecorderSession>('sessions', msg.sessionId);
-  if (!session) throw new Error('会话不存在');
+  const detail = await getSession(msg.sessionId);
+  const session = detail.session;
 
   const selectedIds = Array.isArray(msg.selectedActionIds) ? msg.selectedActionIds : null;
-  const actions = selectedIds ? allActions.filter((a) => selectedIds.includes(a.id!)) : allActions;
-
-  // 截图计划与描述命名共用同一函数,文件名严格一致
-  const plan = planShotUploads(actions, msg.shotLimit || 0);
+  const actions = selectedIds ? detail.actions.filter((a) => selectedIds.includes(a.id!)) : detail.actions;
   const uploads: { token: string; filename: string; content_type: string }[] = [];
-  for (const item of plan) {
-    const a = actions.find((x) => x.id === item.actionId);
-    if (!a) continue;
-    let bytes: Uint8Array;
-    let contentType: string;
-    if (item.isPng) {
-      const baked = await bakeClickMarker(a.screenshot!, a.point!, a.viewport!).catch(() => null);
-      bytes = baked || dataUrlToBytes(a.screenshot!);
-      contentType = baked ? 'image/png' : 'image/jpeg';
-    } else {
-      bytes = dataUrlToBytes(a.screenshot!);
-      contentType = 'image/jpeg';
-    }
-    const upload = await uploadAttachment(settings, item.filename, bytes);
-    if (upload && upload.token) {
-      uploads.push({ token: upload.token, filename: item.filename, content_type: contentType });
-    }
+  if (msg.attachScreenshots !== false) {
+    uploads.push(...(await uploadShots(settings, actions, msg.shotLimit || 0)));
+  }
+  if (msg.attachCsv) {
+    const csv = await uploadCsv(settings, detail, selectedIds);
+    if (csv) uploads.push(csv);
   }
 
   const issue: Record<string, unknown> = {
-    project_id: msg.projectId,
     subject: msg.subject,
     description: msg.description,
   };
+  if (msg.projectId) issue.project_id = msg.projectId;
   if (msg.trackerId) issue.tracker_id = Number(msg.trackerId);
   if (msg.priorityId) issue.priority_id = Number(msg.priorityId);
   if (uploads.length) issue.uploads = uploads;
 
-  const resp = await createIssue(settings, { issue });
-  const issueId = resp && resp.issue ? resp.issue.id : null;
-
-  const issueUrl = issueId ? `${(settings.redmineUrl || '').replace(/\/+$/, '')}/issues/${issueId}` : null;
+  const saved = await saveIssue(settings, msg.issueId, issue);
+  const issueId = saved.issueId;
+  const issueUrl = saved.issueUrl;
   const submissions = appendSubmission(session, {
     issueId,
     issueUrl,
@@ -96,7 +86,23 @@ export async function submitRedmine(msg: {
   return { issueId, issueUrl, uploadCount: uploads.length, submissions };
 }
 
-/** 保留历次提交。旧数据只有一条 issueUrl 时,先补进列表再追加本次。 */
+async function saveIssue(
+  settings: RecorderSettings,
+  existingId: number | null | undefined,
+  issue: Record<string, unknown>
+): Promise<{ issueId: number | null; issueUrl: string | null }> {
+  const base = normalizeBase(settings.redmineUrl);
+  const issueId = existingId ? Number(existingId) : null;
+  if (issueId) {
+    await updateIssue(settings, issueId, { issue });
+    return { issueId, issueUrl: `${base}/issues/${issueId}` };
+  }
+  const resp = await createIssue(settings, { issue });
+  const createdId = resp && resp.issue ? resp.issue.id : null;
+  return { issueId: createdId, issueUrl: createdId ? `${base}/issues/${createdId}` : null };
+}
+
+/** 保留历次提交。同一条 issue 再次更新时改时间和次数,不另开一条。 */
 function appendSubmission(
   session: RecorderSession,
   next: { issueId: number | null; issueUrl: string | null; subject: string; submittedAt: number }
@@ -108,17 +114,83 @@ function appendSubmission(
       issueUrl: session.issueUrl,
       subject: session.subject || '',
       submittedAt: session.endedAt || session.startedAt,
+      revisionCount: 1,
     });
   }
-  if (next.issueId && next.issueUrl && !history.some((item) => item.issueId === next.issueId)) {
-    history.push({
-      issueId: next.issueId,
-      issueUrl: next.issueUrl,
-      subject: next.subject || '',
-      submittedAt: next.submittedAt,
-    });
+  if (!next.issueId || !next.issueUrl) return history;
+  const existing = history.find((item) => item.issueId === next.issueId);
+  if (existing) {
+    existing.subject = next.subject || existing.subject;
+    existing.issueUrl = next.issueUrl;
+    existing.submittedAt = next.submittedAt;
+    existing.revisionCount = (existing.revisionCount || 1) + 1;
+    return history;
   }
+  history.push({
+    issueId: next.issueId,
+    issueUrl: next.issueUrl,
+    subject: next.subject || '',
+    submittedAt: next.submittedAt,
+    revisionCount: 1,
+  });
   return history;
+}
+
+async function uploadShots(
+  settings: RecorderSettings,
+  actions: RecordedAction[],
+  shotLimit: number
+): Promise<{ token: string; filename: string; content_type: string }[]> {
+  const plan = planShotUploads(actions, shotLimit);
+  const uploads: { token: string; filename: string; content_type: string }[] = [];
+  for (const item of plan) {
+    const uploaded = await uploadOneShot(settings, actions, item);
+    if (uploaded) uploads.push(uploaded);
+  }
+  return uploads;
+}
+
+async function uploadOneShot(
+  settings: RecorderSettings,
+  actions: RecordedAction[],
+  item: { actionId: number | undefined; filename: string; isPng: boolean }
+): Promise<{ token: string; filename: string; content_type: string } | null> {
+  const action = actions.find((x) => x.id === item.actionId);
+  if (!action?.screenshot) return null;
+  const baked = item.isPng ? await bakeClickMarker(action.screenshot, action.point!, action.viewport!).catch(() => null) : null;
+  const bytes = baked || dataUrlToBytes(action.screenshot);
+  const contentType = baked ? 'image/png' : 'image/jpeg';
+  const upload = await uploadAttachment(settings, item.filename, bytes);
+  if (!upload?.token) return null;
+  return { token: upload.token, filename: item.filename, content_type: contentType };
+}
+
+async function uploadCsv(
+  settings: RecorderSettings,
+  detail: SessionDetail,
+  selectedIds: number[] | null
+): Promise<{ token: string; filename: string; content_type: string } | null> {
+  const filename = `bug-recorder-session-${detail.session.id.slice(0, 8)}.csv`;
+  const upload = await uploadAttachment(settings, filename, csvBytes(detail, selectedIds));
+  if (!upload?.token) return null;
+  return { token: upload.token, filename, content_type: 'text/csv' };
+}
+
+function csvBytes(detail: SessionDetail, selectedIds: number[] | null): Uint8Array {
+  const ids = selectedIds ? new Set(selectedIds) : null;
+  const scoped = ids ? scopeDetail(detail, ids) : detail;
+  return new TextEncoder().encode(`\uFEFF${buildCsv(scoped)}`);
+}
+
+function scopeDetail(detail: SessionDetail, ids: Set<number>): SessionDetail {
+  return {
+    ...detail,
+    actions: detail.actions.filter((action) => typeof action.id === 'number' && ids.has(action.id)),
+    requests: ownedBySelection(detail.actions, ids, detail.requests),
+    logs: ownedBySelection(detail.actions, ids, detail.logs),
+    pinia: ownedBySelection(detail.actions, ids, detail.pinia),
+    notes: ownedBySelection(detail.actions, ids, detail.notes),
+  };
 }
 
 /** 在截图上烙入半透明点击标记:外圈描边 + 内圈半透明填充 */

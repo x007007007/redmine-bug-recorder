@@ -7,6 +7,7 @@ header button { margin: 0; }
 .capture-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-left: auto; }
 .capture-bar .cap-label { color: var(--muted); font-weight: 600; }
 .capture-bar .chk { display: flex; align-items: center; gap: 3px; color: #3c4043; cursor: pointer; }
+.capture-bar select { width: auto; font-size: 12px; padding: 1px 4px; }
 button { padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; }
 button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
 button.ghost { border: none; background: none; color: var(--muted); }

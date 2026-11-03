@@ -20,6 +20,7 @@
     .capture-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0; font-size: 12px; }
     .capture-bar .cap-label { color: #5f6368; font-weight: 600; }
     .capture-bar .chk { display: flex; align-items: center; gap: 3px; cursor: pointer; }
+    .capture-bar select { width: auto; font-size: 12px; padding: 1px 2px; }
     .sessions-head { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: #5f6368; }
     #sessionList { max-height: 140px; overflow-y: auto; margin-top: 4px; border: 1px solid #e0e3e7; border-radius: 8px; }
     .session-item { padding: 6px 8px; border-top: 1px solid #e0e3e7; cursor: pointer; font-size: 12px; }
@@ -42,7 +43,7 @@
   <div id="sessionList"><div class="empty">正在加载会话列表…</div></div>
   <button id="btnManager">打开管理页(提交 Bug / 设置)</button>
   <div class="err" id="err" hidden></div>
-  <div class="hint">录制旁边的开关可随时关闭点击、截图、键盘、Vue、Console 或请求。Console 会记下错误、警告和未捕获异常。</div>
+  <div class="hint">录制旁边的开关可随时关闭点击、截图、键盘、Vue、Console 或请求。请求范围默认「当前页」,可改成「全局」。发往已配置 Redmine 地址的请求不会被记录。</div>
   <script src="popup.js" type="module"></script>
 </body>
 </html>

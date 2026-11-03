@@ -388,6 +388,7 @@ const shotsBefore = fs.existsSync(FAKE_STORE)
   ? fs.readdirSync(FAKE_STORE).filter((f) => f.startsWith('step-')).length
   : 0;
 await evalJs(manager.sessionId, `document.getElementById('bugAttach').checked = true; true`);
+await evalJs(manager.sessionId, `document.getElementById('bugAttachCsv').checked = true; true`);
 await evalJs(manager.sessionId, `document.getElementById('bugShotMax').value = '5'; true`);
 await evalJs(manager.sessionId, `document.getElementById('bugForm').requestSubmit(); true`);
 try {
@@ -405,6 +406,7 @@ try {
 
 const filesAfter = fs.existsSync(FAKE_STORE) ? fs.readdirSync(FAKE_STORE) : [];
 const shotFiles = filesAfter.filter((f) => /^step-\d+\.(jpg|png)$/.test(f));
+const csvFiles = filesAfter.filter((f) => f.endsWith('.csv'));
 const pngFiles = shotFiles.filter((f) => f.endsWith('.png'));
 ok('截图限量生效(最多 5 张)', shotFiles.length === 5, `服务端收到 ${shotFiles.length} 张(此前 ${shotsBefore})`);
 ok(
@@ -413,12 +415,15 @@ ok(
   `PNG ${pngFiles.length} 张 / JPEG ${shotFiles.length - pngFiles.length} 张`
 );
 const lastIssue = JSON.parse(fs.readFileSync(path.join(FAKE_STORE, 'last-issue.json'), 'utf8'));
+const uploadNames = (lastIssue.issue.uploads || []).map((item) => item.filename);
 ok(
   '假 Redmine 收到的 issue 内容校验',
   lastIssue.issue.project_id === '1' &&
     typeof lastIssue.issue.description === 'string' &&
-    lastIssue.issue.description.includes('AddOrderForm'),
-  `project=${lastIssue.issue.project_id}, 描述 ${lastIssue.issue.description.length} 字符, 附件 ${lastIssue.issue.uploads?.length || 0} 个`
+    lastIssue.issue.description.includes('AddOrderForm') &&
+    csvFiles.length === 1 &&
+    uploadNames.some((name) => String(name).endsWith('.csv')),
+  `project=${lastIssue.issue.project_id}, 描述 ${lastIssue.issue.description.length} 字符, 附件 ${lastIssue.issue.uploads?.length || 0} 个, csv ${csvFiles.length}`
 );
 
 /* 8.5 CSV 导出(点击按钮走真实下载,经 CDP 拦截下载文件) */

@@ -7,6 +7,8 @@ export interface CaptureFlags {
   isVueEnabled: boolean;
   isConsoleEnabled: boolean;
   isRequestEnabled: boolean;
+  /** 为 true 时只记录当前标签页的请求;为 false 时记录所有标签页 */
+  isRequestPageOnly: boolean;
 }
 
 export const DEFAULT_CAPTURE: CaptureFlags = {
@@ -16,6 +18,7 @@ export const DEFAULT_CAPTURE: CaptureFlags = {
   isVueEnabled: true,
   isConsoleEnabled: true,
   isRequestEnabled: true,
+  isRequestPageOnly: true,
 };
 
 export const CAPTURE_TOGGLES: { key: keyof CaptureFlags; label: string; title: string }[] = [
@@ -24,8 +27,16 @@ export const CAPTURE_TOGGLES: { key: keyof CaptureFlags; label: string; title: s
   { key: 'isKeyboardEnabled', label: '键盘', title: '记录键盘输入与回车' },
   { key: 'isVueEnabled', label: 'Vue', title: '记录组件状态与 Pinia' },
   { key: 'isConsoleEnabled', label: 'Console', title: '记录 console.log / info / warn / error 和未捕获异常' },
-  { key: 'isRequestEnabled', label: '请求', title: '记录浏览器 XHR / Fetch' },
+  { key: 'isRequestEnabled', label: '请求', title: '记录 XHR / Fetch。范围见旁边的「当前页 / 全局」' },
 ];
+
+export interface RequestOrigin {
+  tabId: number;
+  url: string;
+  initiator?: string;
+  originUrl?: string;
+  documentUrl?: string;
+}
 
 export function normalizeCapture(raw: Partial<CaptureFlags> | null | undefined): CaptureFlags {
   const out: CaptureFlags = { ...DEFAULT_CAPTURE };
@@ -34,5 +45,26 @@ export function normalizeCapture(raw: Partial<CaptureFlags> | null | undefined):
     const value = raw[item.key];
     if (typeof value === 'boolean') out[item.key] = value;
   }
+  if (typeof raw.isRequestPageOnly === 'boolean') out.isRequestPageOnly = raw.isRequestPageOnly;
   return out;
+}
+
+function isExtensionOrigin(value: string | undefined): boolean {
+  return !!value && /^(chrome-extension|moz-extension):/i.test(value);
+}
+
+/** 插件自己的请求,以及发往已配置 Redmine 的请求,都不记入会话。 */
+export function shouldRecordRequest(
+  details: RequestOrigin,
+  isRequestPageOnly: boolean,
+  activeTabId: number | null,
+  redmineBase: string
+): boolean {
+  if (details.tabId < 0) return false;
+  if (isExtensionOrigin(details.initiator) || isExtensionOrigin(details.originUrl) || isExtensionOrigin(details.documentUrl)) {
+    return false;
+  }
+  if (redmineBase && (details.url === redmineBase || details.url.startsWith(`${redmineBase}/`))) return false;
+  if (!isRequestPageOnly) return true;
+  return activeTabId != null && details.tabId === activeTabId;
 }

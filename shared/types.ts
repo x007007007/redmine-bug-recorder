@@ -110,6 +110,8 @@ export interface IssueLink {
   issueUrl: string;
   subject: string;
   submittedAt: number;
+  /** 含首次创建。大于 1 表示后来又更新过这条 issue */
+  revisionCount?: number;
 }
 
 export interface RecorderSession {

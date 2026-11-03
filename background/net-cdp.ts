@@ -1,5 +1,6 @@
 // CDP 捕获(chrome.debugger,仅 Chrome):XHR/Fetch 响应体 + Console 错误/警告。
 
+import { shouldRecordRequest } from '../shared/capture';
 import { dbAdd, dbCountByIndex } from '../shared/db';
 import { state, mem, getSettings, notifySessionUpdated } from './state';
 import type { LogEntry, RequestEntry } from '../shared/types';
@@ -91,7 +92,7 @@ export function installNetCdp(): void {
 
     switch (method) {
       case 'Network.requestWillBeSent':
-        onRequestWillBeSent(info, p as unknown as CdpRequestWillBeSent);
+        onRequestWillBeSent(tabId, info, p as unknown as CdpRequestWillBeSent);
         return;
       case 'Network.responseReceived': {
         const e = info.reqs.get((p as unknown as CdpResponseReceived).requestId);
@@ -148,10 +149,13 @@ interface CdpLoadingFailed {
   requestId: string;
   errorText?: string;
 }
-function onRequestWillBeSent(info: { reqs: Map<string, RequestEntry> }, params: CdpRequestWillBeSent): void {
+function onRequestWillBeSent(tabId: number, info: { reqs: Map<string, RequestEntry> }, params: CdpRequestWillBeSent): void {
   if (!state.recording || !mem.capture.isRequestEnabled) return;
   const isApi = params.type === 'XHR' || params.type === 'Fetch';
   if (!isApi) return;
+  if (!shouldRecordRequest({ tabId, url: params.request.url }, mem.capture.isRequestPageOnly, mem.activeTabId, mem.redmineBase)) {
+    return;
+  }
   info.reqs.set(params.requestId, {
     sessionId: state.sessionId!,
     ts: Date.now(),

@@ -31,11 +31,12 @@ function buildSessionItem(s: SessionSummary): HTMLDivElement {
   t.className = 't';
   t.textContent = fmtTime(s.startedAt);
 
+  const links = issueLinksOf(s);
   const sub = document.createElement('div');
   sub.className = 's';
   const chip = document.createElement('span');
-  const statusText =
-    { recording: '录制中', stopped: '已停止', submitted: `已提交 #${s.issueId || ''}` }[s.status] || s.status;
+  const submittedText = links.length > 1 ? `已提交 ${links.length} 条` : `已提交 #${s.issueId || links[0]?.issueId || ''}`;
+  const statusText = { recording: '录制中', stopped: '已停止', submitted: submittedText }[s.status] || s.status;
   chip.className = `status-chip status-${s.status}`;
   chip.textContent = statusText;
   sub.append(
@@ -44,15 +45,18 @@ function buildSessionItem(s: SessionSummary): HTMLDivElement {
       ` 步骤 ${s.actionCount} · API ${s.requestCount}${s.logCount ? ` · Console ${s.logCount}` : ''}${s.piniaCount ? ` · Pinia ${s.piniaCount}` : ''}`
     )
   );
-  for (const link of [...issueLinksOf(s)].reverse()) {
+  const issues = document.createElement('div');
+  issues.className = 'session-issues';
+  for (const link of [...links].reverse()) {
     const anchor = document.createElement('a');
     anchor.href = link.issueUrl;
     anchor.target = '_blank';
     anchor.rel = 'noreferrer';
-    anchor.textContent = `#${link.issueId}`;
+    const subject = link.subject ? ` ${link.subject.slice(0, 24)}` : '';
+    anchor.textContent = `#${link.issueId}${subject}`;
     anchor.title = link.issueUrl;
     anchor.addEventListener('click', (ev) => ev.stopPropagation());
-    sub.appendChild(anchor);
+    issues.appendChild(anchor);
   }
 
   const del = document.createElement('button');
@@ -76,7 +80,9 @@ function buildSessionItem(s: SessionSummary): HTMLDivElement {
     })();
   });
 
-  div.append(t, sub, del);
+  div.append(t, sub);
+  if (links.length) div.appendChild(issues);
+  div.appendChild(del);
   div.addEventListener('click', () => void selectSession(s.id));
   return div;
 }

@@ -3,7 +3,7 @@
 
 import type { CaptureFlags } from '../shared/capture';
 import type { ChangeNote, RecorderSettings } from '../shared/types';
-import { getSettings, state, mem, saveCapture, currentState, whenCaptureReady } from './state';
+import { getSettings, state, mem, saveCapture, currentState, whenCaptureReady, rememberRedmineBase } from './state';
 import { startRecording, stopRecording, onRecAction, onRecPinia } from './recorder';
 import { listSessions, getSession, deleteSession, deleteItems } from './sessions';
 import { getSelection, setSelection } from './selection';
@@ -46,6 +46,7 @@ const HANDLERS: Record<string, Handler> = {
   SETTINGS_SET: async (msg) => {
     await whenCaptureReady();
     const settings = { ...(msg.settings as RecorderSettings), capture: mem.capture };
+    rememberRedmineBase(settings.redmineUrl);
     await chrome.storage.local.set({ recorderSettings: settings });
     return { ok: true };
   },

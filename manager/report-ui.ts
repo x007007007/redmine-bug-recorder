@@ -10,6 +10,15 @@ import type { IssueLink, RecorderSession } from '../shared/types';
 import { selectedActions } from './steps-ui';
 import { buildCsv } from './export-csv';
 
+const DOCK_KEY = 'bugrec.submitDock';
+
+interface DockPref {
+  side: 'left' | 'right';
+  isCollapsed: boolean;
+}
+
+let updatingIssueId: number | null = null;
+
 function shotLimit(): number {
   const el = $('bugShotMax') as HTMLInputElement | null;
   const n = Number(el && el.value);
@@ -28,12 +37,18 @@ export function initReport(): void {
   $('btnExport').addEventListener('click', onExport);
   $('btnExportCsv').addEventListener('click', onExportCsv);
   $('bugForm').addEventListener('submit', (e) => void onSubmit(e));
+  $('btnDockExpand').addEventListener('click', () => setDockCollapsed(false));
+  $('btnDockCollapse').addEventListener('click', () => setDockCollapsed(true));
+  $('btnDockSide').addEventListener('click', () => flipDockSide());
+  $('btnDockSideRail').addEventListener('click', () => flipDockSide());
+  applyDock(readDock());
 }
 
 export function prefillForm(): void {
   if (!store.cache) return;
   const { session, actions } = store.cache;
   $('submitResult').textContent = '';
+  setUpdateTarget(null);
   if (!store.subjectDirty) ($('bugSubject') as HTMLInputElement).value = session.subject || buildSubject(session, actions);
   if (!store.descDirty) regenerateDescription();
   renderIssueLinks(session);
@@ -74,13 +89,14 @@ async function onSubmit(e: Event): Promise<void> {
   e.preventDefault();
   if (!store.cache) return;
   const projectId = ($('bugProjectManual') as HTMLInputElement).value.trim() || ($('bugProject') as HTMLSelectElement).value;
-  if (!projectId) {
+  if (!updatingIssueId && !projectId) {
     showError(new Error('请先载入并选择项目,或在"手动填项目标识"中填写(Redmine 项目页 URL 中的标识或数字 ID)'));
     return;
   }
   const btn = $('btnSubmit') as HTMLButtonElement;
+  const isUpdate = updatingIssueId != null;
   btn.disabled = true;
-  btn.textContent = '提交中…';
+  btn.textContent = isUpdate ? '更新中…' : '提交中…';
   $('submitResult').textContent = '';
   try {
     const res = await send({
@@ -89,9 +105,11 @@ async function onSubmit(e: Event): Promise<void> {
       subject: ($('bugSubject') as HTMLInputElement).value.trim(),
       description: ($('bugDescription') as HTMLTextAreaElement).value,
       projectId,
+      issueId: updatingIssueId,
       trackerId: ($('bugTracker') as HTMLSelectElement).value,
       priorityId: ($('bugPriority') as HTMLSelectElement).value,
       attachScreenshots: ($('bugAttach') as HTMLInputElement).checked,
+      attachCsv: ($('bugAttachCsv') as HTMLInputElement).checked,
       shotLimit: shotLimit(),
       selectedActionIds: [...store.selected],
     });
@@ -100,16 +118,18 @@ async function onSubmit(e: Event): Promise<void> {
       store.cache.session.issueId = res.issueId;
       store.cache.session.issueUrl = res.issueUrl;
       store.cache.session.submissions = res.submissions;
+      if (store.full && store.full.session.id === store.cache.session.id) store.full.session.submissions = res.submissions;
       renderIssueLinks(store.cache.session);
     }
-    $('submitResult').textContent = res.uploadCount ? `已创建,含 ${res.uploadCount} 张截图` : '已创建';
+    const verb = isUpdate ? `已更新 #${res.issueId}` : '已创建';
+    $('submitResult').textContent = res.uploadCount ? `${verb},含 ${res.uploadCount} 个附件` : verb;
     const { refreshSessions } = await import('./sessions-ui');
     void refreshSessions();
   } catch (err) {
     showError(err);
   } finally {
     btn.disabled = false;
-    btn.textContent = '🚀 提交到 Redmine';
+    paintSubmitButton();
   }
 }
 
@@ -127,9 +147,11 @@ export function issueLinksOf(session: RecorderSession): IssueLink[] {
 }
 
 export function renderIssueLinks(session: RecorderSession): void {
-  const box = $('issueLinks');
+  const box = $('issueHistory');
   box.textContent = '';
   const links = issueLinksOf(session);
+  const rail = $('btnDockExpand');
+  rail.textContent = links.length ? `提交 Bug · ${links.length}` : '提交 Bug';
   if (!links.length) {
     box.hidden = true;
     return;
@@ -137,22 +159,84 @@ export function renderIssueLinks(session: RecorderSession): void {
   box.hidden = false;
   const title = document.createElement('div');
   title.className = 'issue-links-title';
-  title.textContent = `已提交 ${links.length} 个 issue`;
+  title.textContent = `历史提交 ${links.length} 条`;
   const list = document.createElement('ul');
   for (const link of [...links].reverse()) {
-    const li = document.createElement('li');
-    const anchor = document.createElement('a');
-    anchor.href = link.issueUrl;
-    anchor.target = '_blank';
-    anchor.rel = 'noreferrer';
-    const subject = link.subject ? ` ${link.subject.slice(0, 42)}` : '';
-    anchor.textContent = `#${link.issueId}${subject}`;
-    const time = document.createElement('time');
-    time.textContent = fmtTime(link.submittedAt);
-    li.append(anchor, time);
-    list.appendChild(li);
+    list.appendChild(buildHistoryItem(link));
   }
   box.append(title, list);
+}
+
+function buildHistoryItem(link: IssueLink): HTMLLIElement {
+  const li = document.createElement('li');
+  const anchor = document.createElement('a');
+  anchor.href = link.issueUrl;
+  anchor.target = '_blank';
+  anchor.rel = 'noreferrer';
+  const subject = link.subject ? ` ${link.subject.slice(0, 42)}` : '';
+  anchor.textContent = `#${link.issueId}${subject}`;
+  const time = document.createElement('time');
+  const revised = (link.revisionCount || 1) > 1 ? ` · 更新过 ${link.revisionCount} 次` : '';
+  time.textContent = `${fmtTime(link.submittedAt)}${revised}`;
+  const update = document.createElement('button');
+  update.type = 'button';
+  update.textContent = updatingIssueId === link.issueId ? '正在更新' : '更新这条';
+  update.addEventListener('click', () => {
+    setUpdateTarget(link.issueId);
+    setDockCollapsed(false);
+  });
+  li.append(anchor, time, update);
+  return li;
+}
+
+function setUpdateTarget(issueId: number | null): void {
+  updatingIssueId = issueId;
+  const hint = $('updateHint');
+  if (!issueId) {
+    hint.hidden = true;
+    hint.textContent = '';
+  } else {
+    hint.hidden = false;
+    hint.textContent = `正在更新 #${issueId}:会修改这条工单的主题和描述,并追加附件,不会新建 issue。`;
+  }
+  paintSubmitButton();
+  if (store.cache) renderIssueLinks(store.cache.session);
+}
+
+function paintSubmitButton(): void {
+  const btn = $('btnSubmit') as HTMLButtonElement;
+  if (btn.disabled) return;
+  btn.textContent = updatingIssueId ? `更新 #${updatingIssueId}` : '🚀 提交到 Redmine';
+}
+
+function readDock(): DockPref {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DOCK_KEY) || '') as Partial<DockPref>;
+    if (raw.side === 'left' || raw.side === 'right') {
+      return { side: raw.side, isCollapsed: raw.isCollapsed !== false };
+    }
+  } catch {
+    /* 没有存过偏好时收起在右侧 */
+  }
+  return { side: 'right', isCollapsed: true };
+}
+
+function applyDock(pref: DockPref): void {
+  document.body.dataset.dockSide = pref.side;
+  document.body.dataset.dockCollapsed = pref.isCollapsed ? '1' : '0';
+  localStorage.setItem(DOCK_KEY, JSON.stringify(pref));
+}
+
+function setDockCollapsed(isCollapsed: boolean): void {
+  const pref = readDock();
+  pref.isCollapsed = isCollapsed;
+  applyDock(pref);
+}
+
+function flipDockSide(): void {
+  const pref = readDock();
+  pref.side = pref.side === 'left' ? 'right' : 'left';
+  applyDock(pref);
 }
 
 function onExport(): void {

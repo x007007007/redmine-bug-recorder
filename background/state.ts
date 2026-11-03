@@ -1,6 +1,7 @@
 // 共享状态与工具:录制会话状态(SW 休眠可恢复)、设置读取、徽章、通知。
 
 import { normalizeCapture, type CaptureFlags } from '../shared/capture';
+import { normalizeBase } from '../shared/redmine';
 import type { RecorderSettings, RequestEntry, StateInfo } from '../shared/types';
 
 const SETTINGS_KEY = 'recorderSettings';
@@ -13,12 +14,16 @@ export const mem: {
   captureQueue: Promise<void>;
   debuggerFailed: boolean;
   capture: CaptureFlags;
+  activeTabId: number | null;
+  redmineBase: string;
 } = {
   debuggerTabs: new Map(),
   webRequestPending: new Map(),
   captureQueue: Promise.resolve(),
   debuggerFailed: false,
   capture: normalizeCapture(undefined),
+  activeTabId: null,
+  redmineBase: '',
 };
 
 export function sleep(ms: number): Promise<void> {
@@ -74,7 +79,12 @@ export function whenCaptureReady(): Promise<CaptureFlags> {
 async function loadCapture(): Promise<CaptureFlags> {
   const settings = await getSettings();
   mem.capture = normalizeCapture(settings.capture);
+  rememberRedmineBase(settings.redmineUrl);
   return mem.capture;
+}
+
+export function rememberRedmineBase(url: string | undefined): void {
+  mem.redmineBase = normalizeBase(url);
 }
 
 export async function saveCapture(patch: Partial<CaptureFlags>): Promise<CaptureFlags> {

@@ -6,16 +6,12 @@
 
 ```bash
 git tag v0.2.4
-git push origin v0.2.4    # GitHub Actions 打包,并把安装包放到 GitHub Release(中转)
-git push gitlab v0.2.4    # GitLab CI 拉取安装包,创建正式 Release
+git push origin v0.2.4    # GitHub Actions 打包,并把安装包放到 GitHub Release
 ```
 
-两个远程都要推。GitHub 的公网 Runner 访问不到内网 GitLab,内网 Runner 也连不上 GitHub Release 的附件地址,所以同一 tag 会构建两次:
+只推 GitHub。GitHub Actions(`.github/workflows/package.yml`):`main` 每次推送都会打包并保留 14 天构建产物;打 `vX.Y.Z` 时再上传到 GitHub Release。
 
-- GitHub Actions(`.github/workflows/package.yml`):`main` 每次推送都会打包并保留 14 天构建产物;打 `vX.Y.Z` 时再上传到 GitHub Release
-- GitLab CI(`.gitlab-ci.yml`):只在 `vX.Y.Z` 上运行,用该 tag 的源码再构建一次,把 Chrome zip、Firefox xpi、源码 zip 放进 Package Registry,并创建 [GitLab Release](http://gitlab.809.kinkotec.com.cn/xingci.xu/redmine-bug-recorder/-/releases)
-
-tag 和三处版本号不一致时,GitHub 打包会失败。GitLab 会等 GitHub Release 齐三个文件,最多约 10 分钟。
+tag 和三处版本号不一致时,GitHub 打包会失败。
 
 ## 产出一览
 
