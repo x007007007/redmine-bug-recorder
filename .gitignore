@@ -17,6 +17,7 @@ __pycache__/
 web-ext-artifacts/
 release/
 .release-ff-stage/
+.release-chrome-stage/
 
 # TS 构建产物与依赖
 node_modules/

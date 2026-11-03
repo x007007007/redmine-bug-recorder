@@ -1,5 +1,22 @@
 # 发布指南(Publishing)
 
+## 版本发布(git tag)
+
+版本号以 `manifest.json`、`manifest.firefox.json`、`package.json` 三处同时递增,并且必须相同。打标签 `v` + 版本号,例如 `0.2.4` 对应 `v0.2.4`。
+
+```bash
+git tag v0.2.4
+git push origin v0.2.4    # GitHub Actions 打包,并把安装包放到 GitHub Release(中转)
+git push gitlab v0.2.4    # GitLab CI 拉取安装包,创建正式 Release
+```
+
+两个远程都要推。GitHub 的公网 Runner 访问不到内网 GitLab,所以打包和发布分成两段:
+
+- GitHub Actions(`.github/workflows/package.yml`):`main` 每次推送都会打包并保留 14 天构建产物;打 `vX.Y.Z` 时再上传到 GitHub Release
+- GitLab CI(`.gitlab-ci.yml`):只在 `vX.Y.Z` 上运行,把 Chrome zip、Firefox xpi、源码 zip 放进 Package Registry,并创建 [GitLab Release](http://gitlab.809.kinkotec.com.cn/xingci.xu/redmine-bug-recorder/-/releases)
+
+tag 和三处版本号不一致时,GitHub 打包会失败。GitLab 会等 GitHub Release 齐三个文件,最多约 10 分钟。
+
 ## 产出一览
 
 ```bash

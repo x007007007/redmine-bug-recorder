@@ -4,6 +4,8 @@
 
 许可:**不可商用**。个人学习、教学、研究和非营利使用可以;商业使用必须先邮件联系作者取得书面授权:`x007007007@hotmail.com`。全文见 [LICENSE](LICENSE)。
 
+版本发布用 git tag `vX.Y.Z`(与 manifest 版本一致)。GitHub Actions 打包,正式发布页是 GitLab Release。步骤见 [PUBLISHING.md](PUBLISHING.md)。
+
 ## 功能
 
 - **操作录制**:点击、键盘输入(防抖合并)、下拉选择、表单提交、页面跳转(SPA 路由变化也算一步);**可跨标签页**(页面标题会标注「标签页 N」)

@@ -1,73 +1,59 @@
-// 发布打包:构建 dist/ 后产出两个商店包到 release/:
-//   bug-recorder-chrome-v{ver}.zip   (Chrome Web Store 用,dist 原样)
-//   bug-recorder-firefox-v{ver}.xpi  (AMO 用,manifest.firefox.json 作为包内 manifest.json)
-import { build } from 'esbuild';
-import { cp, mkdir, readdir, copyFile, readFile, rm } from 'node:fs/promises';
+// 把已经构建好的 dist/ 打成两个商店包,写到 release/:
+//   bug-recorder-chrome-v{ver}.zip   (Chrome Web Store,manifest.json)
+//   bug-recorder-firefox-v{ver}.xpi  (AMO,manifest.firefox.json 作为包内 manifest.json)
+// 构建本身由 build.mjs 完成,这里不再另写一套入口,避免漏文件。
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { cp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const release = path.join(root, 'release');
 
-// 1. 构建(与 build.mjs 相同的入口)
-const COMMON = {
-  bundle: true,
-  sourcemap: true,
-  logLevel: 'silent',
-  target: ['chrome120', 'firefox128'],
-  legalComments: 'none',
-};
-const entries = [
-  { in: 'background/service-worker.ts', out: 'background/service-worker.js', format: 'esm' },
-  { in: 'content/recorder.ts', out: 'content/recorder.js', format: 'iife' },
-  { in: 'content/vue-probe.ts', out: 'content/vue-probe.js', format: 'iife' },
-  { in: 'popup/popup.ts', out: 'popup/popup.js', format: 'esm' },
-  { in: 'manager/manager.ts', out: 'manager/manager.js', format: 'esm' },
-  { in: 'devtools/devtools.ts', out: 'devtools/devtools.js', format: 'iife' },
-  { in: 'devtools/panel.ts', out: 'devtools/panel.js', format: 'esm' },
-];
-if (existsSync(dist)) await rm(dist, { recursive: true, force: true });
-await mkdir(dist, { recursive: true });
-for (const f of ['manifest.json', 'manifest.firefox.json']) {
-  await copyFile(path.join(root, f), path.join(dist, f));
-}
-await cp(path.join(root, 'icons'), path.join(dist, 'icons'), { recursive: true });
-for (const dir of ['popup', 'manager', 'devtools']) {
-  await mkdir(path.join(dist, dir), { recursive: true });
-  for (const f of await readdir(path.join(root, dir))) {
-    if (f.endsWith('.html') || f.endsWith('.css')) {
-      await copyFile(path.join(root, dir, f), path.join(dist, dir, f));
-    }
-  }
-}
-for (const e of entries) {
-  await build({ ...COMMON, entryPoints: [path.join(root, e.in)], outfile: path.join(dist, e.out), format: e.format });
-}
+assert.ok(existsSync(path.join(dist, 'manifest.json')), 'dist/manifest.json 不存在,请先 npm run build');
+assert.ok(existsSync(path.join(dist, 'content/console-hook.js')), 'dist 缺少 content/console-hook.js');
 
-// 2. 版本号来自 Chrome manifest
 const manifest = JSON.parse(await readFile(path.join(dist, 'manifest.json'), 'utf8'));
+const firefoxManifest = JSON.parse(await readFile(path.join(root, 'manifest.firefox.json'), 'utf8'));
+const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+assert.equal(firefoxManifest.version, manifest.version, 'manifest.firefox.json 版本与 manifest.json 不一致');
+assert.equal(pkg.version, manifest.version, 'package.json 版本与 manifest.json 不一致');
+
 const ver = manifest.version;
 
-// 3. 打包(release/ 不进 git)
 await rm(release, { recursive: true, force: true });
 await mkdir(release, { recursive: true });
-const zip = (srcDir, outFile) =>
+
+/** @param {string} srcDir @param {string} outFile */
+function zipDir(srcDir, outFile) {
   execFileSync('zip', ['-rq', path.resolve(outFile), '.'], { cwd: srcDir, stdio: 'inherit' });
+}
 
-zip(dist, path.join(release, `bug-recorder-chrome-v${ver}.zip`));
+/**
+ * @param {string} stageDir
+ * @param {'chrome' | 'firefox'} target
+ */
+async function stage(stageDir, target) {
+  await rm(stageDir, { recursive: true, force: true });
+  await cp(dist, stageDir, { recursive: true });
+  await rm(path.join(stageDir, 'manifest.firefox.json'), { force: true });
+  if (target === 'firefox') {
+    await rm(path.join(stageDir, 'manifest.json'));
+    await cp(path.join(root, 'manifest.firefox.json'), path.join(stageDir, 'manifest.json'));
+  }
+}
 
-// Firefox 包:firefox manifest 换名,且不含 Chrome 专属字段文件
-const ffStage = path.join(root, '.release-ff-stage');
-await rm(ffStage, { recursive: true, force: true });
-await cp(dist, ffStage, { recursive: true });
-await rm(path.join(ffStage, 'manifest.json'));
-await cp(path.join(root, 'manifest.firefox.json'), path.join(ffStage, 'manifest.json'));
-// Firefox 不支持 "key"(Chrome 专属),留着的校验问题——manifest.firefox.json 本就没有
-zip(ffStage, path.join(release, `bug-recorder-firefox-v${ver}.xpi`));
-await rm(ffStage, { recursive: true, force: true });
+const chromeStage = path.join(root, '.release-chrome-stage');
+const firefoxStage = path.join(root, '.release-ff-stage');
+await stage(chromeStage, 'chrome');
+await stage(firefoxStage, 'firefox');
+zipDir(chromeStage, path.join(release, `bug-recorder-chrome-v${ver}.zip`));
+zipDir(firefoxStage, path.join(release, `bug-recorder-firefox-v${ver}.xpi`));
+await rm(chromeStage, { recursive: true, force: true });
+await rm(firefoxStage, { recursive: true, force: true });
 
 console.log(`release ready (v${ver}):`);
-for (const f of await readdir(release)) console.log('  ' + path.join(release, f));
+for (const name of await readdir(release)) console.log('  ' + path.join(release, name));
