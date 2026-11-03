@@ -1,48 +1,73 @@
-Non-Commercial License
-不可商用许可
+# PolyForm Noncommercial License 1.0.0
 
-Copyright (c) 2026 x007007007 <x007007007@hotmail.com>
+<https://polyformproject.org/licenses/noncommercial/1.0.0>
 
-本软件以源码形式发布。非商业使用无需另行取得授权。任何商业使用都必须事先联系作者并取得书面授权。
+## Acceptance
 
-## 1. 授权
+In order to get any license under these terms, you must agree to them as both strict obligations and conditions to all your licenses.
 
-在遵守本协议的前提下,著作权人授予你全球范围、非独占、不可转让、可撤销的权利,为非商业目的使用、复制、修改和分发本软件及其修改版本。
+## Copyright License
 
-## 2. 什么是非商业
+The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose.  However, you may only distribute the software according to [Distribution License](#distribution-license) and make changes or new works based on the software according to [Changes and New Works License](#changes-and-new-works-license).
 
-非商业是指不把本软件或其修改版本用于以营利为目的的活动。下列情形属于商业使用,不在本协议授权范围内:
+## Distribution License
 
-- 出售、出租、转授权或收取许可费
-- 作为付费产品、付费服务、广告或订阅的一部分提供
-- 用于公司或其他商业主体的内部业务运营
+The licensor grants you an additional copyright license to distribute copies of the software.  Your license to distribute covers distributing the software with changes and new works permitted by [Changes and New Works License](#changes-and-new-works-license).
 
-个人学习、教学、学术研究,以及个人或非营利组织不以营利为目的的内部使用,属于非商业使用。
+## Notices
 
-## 3. 商业授权
+You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any plain-text lines beginning with `Required Notice:` that the licensor provided with the software.  For example:
 
-商业使用必须事先取得作者的书面授权。联系方式:
+> Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
 
-x007007007@hotmail.com
+## Changes and New Works License
 
-未取得书面授权的商业使用,本协议不授予任何权利。
+The licensor grants you an additional copyright license to make changes and new works based on the software for any permitted purpose.
 
-## 4. 分发
+## Patent License
 
-分发本软件或其修改版本时,必须保留本协议、版权声明和上述联系方式。
+The licensor grants you a patent license for the software that covers patent claims the licensor can license, or becomes able to license, that you would infringe by using the software.
 
-## 5. 无担保
+## Noncommercial Purposes
 
-本软件按「原样」提供,作者不作任何明示或暗示的担保,包括适销性、特定用途适用性和不侵权。作者不对使用本软件造成的任何损失承担责任。
+Any noncommercial purpose is a permitted purpose.
 
-## 6. 终止
+## Personal Uses
 
-如果你违反本协议,授权自动终止。终止后你必须停止使用并删除持有的副本。
+Personal use for research, experiment, and testing for the benefit of public knowledge, personal study, private entertainment, hobby projects, amateur pursuits, or religious observance, without any anticipated commercial application, is use for a permitted purpose.
 
----
+## Noncommercial Organizations
 
-English summary
+Use by any charitable organization, educational institution, public research organization, public safety or health organization, environmental protection organization, or government institution is use for a permitted purpose regardless of the source of funding or obligations resulting from the funding.
 
-Copyright (c) 2026 x007007007 <x007007007@hotmail.com>
+## Fair Use
 
-Non-commercial use, copying, modification, and distribution are permitted under the terms above. Commercial use is not permitted unless you first obtain written authorization from the author at x007007007@hotmail.com. The software is provided "as is", without warranty.
+You may have "fair use" rights for the software under the law. These terms do not limit them.
+
+## No Other Rights
+
+These terms do not allow you to sublicense or transfer any of your licenses to anyone else, or prevent the licensor from granting licenses to anyone else.  These terms do not imply any other licenses.
+
+## Patent Defense
+
+If you make any written claim that the software infringes or contributes to infringement of any patent, your patent license for the software granted under these terms ends immediately. If your company makes such a claim, your patent license ends immediately for work on behalf of your company.
+
+## Violations
+
+The first time you are notified in writing that you have violated any of these terms, or done anything with the software not covered by your licenses, your licenses can nonetheless continue if you come into full compliance with these terms, and take practical steps to correct past violations, within 32 days of receiving notice.  Otherwise, all your licenses end immediately.
+
+## No Liability
+
+***As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.***
+
+## Definitions
+
+The **licensor** is the individual or entity offering these terms, and the **software** is the software the licensor makes available under these terms.
+
+**You** refers to the individual or entity agreeing to these terms.
+
+**Your company** is any legal entity, sole proprietorship, or other kind of organization that you work for, plus all organizations that have control over, are under the control of, or are under common control with that organization.  **Control** means ownership of substantially all the assets of an entity, or the power to direct its management and policies by vote, contract, or otherwise.  Control can be direct or indirect.
+
+**Your licenses** are all the licenses granted to you for the software under these terms.
+
+**Use** means anything you do with the software requiring one of your licenses.

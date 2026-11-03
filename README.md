@@ -2,7 +2,7 @@
 
 测试助手浏览器插件(Chrome MV3 / Firefox MV3):录制 UI 测试操作过程,每步自动截图,捕获 API 交互与 Vue/Pinia 状态,勾选 review 后一键提交 Bug 到 Redmine。
 
-许可:**不可商用**。个人学习、教学、研究和非营利使用可以;商业使用必须先邮件联系作者取得书面授权:`x007007007@hotmail.com`。全文见 [LICENSE](LICENSE)。
+许可:[PolyForm Noncommercial 1.0.0](LICENSE)(SPDX: `PolyForm-Noncommercial-1.0.0`)。非商业目的可以复制、修改和分发;商业使用须先邮件联系作者取得书面授权:`x007007007@hotmail.com`。再分发时保留本许可,以及 [NOTICE](NOTICE) 中的 `Required Notice` 行。
 
 版本发布:三处版本号与 git tag `vX.Y.Z` 一致。推到 GitHub `main` 后,Actions 在该 tag 还不存在时自动创建,并发布到 GitHub Release。已有 tag 不会改指向。步骤见 [PUBLISHING.md](PUBLISHING.md)。
 
