@@ -28,12 +28,22 @@ PACKAGE = "redmine-bug-recorder"
 
 
 def request(method, url, data=None, headers=None, timeout=180):
-    req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status, resp.read()
-    except urllib.error.HTTPError as exc:
-        return exc.code, exc.read()
+    merged = {"User-Agent": "redmine-bug-recorder-ci"}
+    if headers:
+        merged.update(headers)
+    last_error = None
+    for attempt in range(1, 4):
+        req = urllib.request.Request(url, data=data, method=method, headers=merged)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status, resp.read()
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read()
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            last_error = exc
+            print(f"请求失败 {attempt}/3 {url.split('?', 1)[0]} {exc}")
+            time.sleep(5)
+    raise SystemExit(f"请求失败 {url.split('?', 1)[0]} {last_error}")
 
 
 def gitlab(method, path, data=None, content_type=None):
@@ -102,7 +112,7 @@ def lookup_file_id(name):
 
 def create_release(links):
     description = (
-        f"版本 {VER}。安装包由 GitHub Actions 按同一 git tag 构建,本页是正式发布。\n\n"
+        f"版本 {VER}。安装包由该 git tag 构建,本页是正式发布。\n\n"
         "不可商用。商业使用必须先联系作者 x007007007@hotmail.com 取得书面授权。"
     )
     payload = {
@@ -123,18 +133,31 @@ def create_release(links):
     print(created.get("tag_name"), created.get("_links", {}).get("self", ""))
 
 
+def local_release_files():
+    paths = [Path("release") / name for name in FILES]
+    if all(path.is_file() and path.stat().st_size > 0 for path in paths):
+        return paths
+    return None
+
+
 def main():
     if release_exists():
         print(f"GitLab Release {TAG} 已存在,跳过")
         return
-    assets = wait_github_assets()
-    stage = Path("/tmp/bugrec-assets")
-    stage.mkdir(parents=True, exist_ok=True)
+    local = local_release_files()
     links = []
-    for name in FILES:
-        print(f"下载 {name}")
-        status, blob = request("GET", assets[name], timeout=180)
-        assert status == 200 and blob, f"下载 {name} 失败 HTTP {status}"
+    if local is not None:
+        print("使用本流水线构建的 release/")
+        blobs = [(path.name, path.read_bytes()) for path in local]
+    else:
+        assets = wait_github_assets()
+        blobs = []
+        for name in FILES:
+            print(f"下载 {name}")
+            status, blob = request("GET", assets[name], timeout=60)
+            assert status == 200 and blob, f"下载 {name} 失败 HTTP {status}"
+            blobs.append((name, blob))
+    for name, blob in blobs:
         file_id = upload(name, blob)
         links.append({
             "name": name,
