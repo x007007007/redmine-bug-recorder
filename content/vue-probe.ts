@@ -158,7 +158,22 @@ function install(): void {
   document.addEventListener(
     'bugrec:probe',
     (e) => {
-      const id = (e as CustomEvent<{ id?: string }>).detail && (e as CustomEvent<{ id?: string }>).detail.id;
+      // Firefox 下隔离世界 CustomEvent.detail 对页面不可读（Xray 不透明对象，
+      // 读属性抛 "Permission denied to access property"）——防御性读取，失败
+      // 时回退 window 通道（与 __bugrecVueProbe 标记同款跨 realm 通路）。
+      let id: string | undefined;
+      try {
+        id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      } catch {
+        id = undefined;
+      }
+      if (!id) {
+        try {
+          id = (window as unknown as { __bugrecProbeId?: string }).__bugrecProbeId;
+        } catch {
+          id = undefined;
+        }
+      }
       // 扁平结构:{ component, chain, props, piniaChanges, error }
       const info: VueInfo = { component: null, chain: [], props: null, piniaChanges: [] };
       try {

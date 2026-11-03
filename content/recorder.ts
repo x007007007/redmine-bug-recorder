@@ -3,12 +3,15 @@
 // 值不脱敏(提交前由测试人员 review),仅做长度截断。构建时打包为单个 IIFE 经典脚本。
 
 import { truncate, textOf, fieldLabel, cssPath } from './dom-meta';
+import { captureFlags, watchCaptureFlags } from './capture-flags';
+import { installNoteCapture } from './note-ui';
 import type { RecordedAction, VueInfo } from '../shared/types';
 
 function install(): void {
   const w = window as unknown as Record<string, unknown>;
   if (w.__bugRecorderInstalled) return;
   w.__bugRecorderInstalled = true;
+  watchCaptureFlags();
 
   const KEYBOARD_DEBOUNCE = 700;
 
@@ -19,7 +22,7 @@ function install(): void {
       ts: Date.now(),
       selector: el ? cssPath(el) : '',
       label: el ? fieldLabel(el) || textOf(el) : '',
-      vue: collectVueInfo(el),
+      vue: captureFlags().isVueEnabled ? collectVueInfo(el) : null,
     };
   }
 
@@ -34,6 +37,8 @@ function install(): void {
     };
     try {
       el.setAttribute('data-bugrec-eid', id);
+      // detail 经隔离世界分发在 Firefox 页面侧不可读：同步经 window 透传 id 兜底
+      (window as unknown as Record<string, unknown>).__bugrecProbeId = id;
       document.addEventListener('bugrec:vue-info', onInfo, { once: true });
       document.dispatchEvent(new CustomEvent('bugrec:probe', { detail: { id } }));
       document.removeEventListener('bugrec:vue-info', onInfo);
@@ -60,6 +65,7 @@ function install(): void {
   document.addEventListener(
     'click',
     (e) => {
+      if (!captureFlags().isClickEnabled) return;
       if (!(e.target instanceof Element)) return;
       const el = e.target.closest(INTERACTIVE) || e.target;
       const action: Partial<RecordedAction> = Object.assign({ kind: 'click' as const }, baseMeta(el));
@@ -97,6 +103,7 @@ function install(): void {
   document.addEventListener(
     'input',
     (e) => {
+      if (!captureFlags().isKeyboardEnabled) return;
       const el = e.target;
       if (!(el instanceof HTMLElement) || !el.matches(TEXT_INPUT)) return;
       const t = pending.get(el);
@@ -113,6 +120,7 @@ function install(): void {
   );
 
   function recordKeyboard(el: HTMLElement): void {
+    if (!captureFlags().isKeyboardEnabled) return;
     send(Object.assign({ kind: 'input' as const, inputType: 'keyboard', value: truncate((el as HTMLInputElement).value ?? '') }, baseMeta(el)));
   }
 
@@ -127,6 +135,7 @@ function install(): void {
   document.addEventListener(
     'keydown',
     (e) => {
+      if (!captureFlags().isKeyboardEnabled) return;
       const el = e.target;
       if (!(el instanceof Element) || !el.matches('input,textarea')) return;
       if (e.key === 'Enter' || e.key === 'Escape') {
@@ -175,7 +184,22 @@ function install(): void {
   );
 
   /* 主世界 Pinia 变更流 → 后台(按 ts 关联到步骤) */
+  document.addEventListener('bugrec:console', (e) => {
+    if (!captureFlags().isConsoleEnabled) return;
+    const detail = (e as CustomEvent<{ level?: string; text?: string }>).detail;
+    if (!detail || !detail.text) return;
+    try {
+      const p = chrome.runtime.sendMessage({ type: 'REC_LOG', level: detail.level, text: detail.text });
+      if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  });
+
+  installNoteCapture((el) => (captureFlags().isVueEnabled ? collectVueInfo(el) : null));
+
   document.addEventListener('bugrec:pinia', (e) => {
+    if (!captureFlags().isVueEnabled) return;
     try {
       const p = chrome.runtime.sendMessage({ type: 'REC_PINIA', event: (e as CustomEvent).detail });
       if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {});
