@@ -1,4 +1,5 @@
-# 只在 git tag vX.Y.Z 上发布。打包由 GitHub Actions 完成,这里把安装包放进 GitLab Release。
+# 只在 git tag vX.Y.Z 上发布。GitHub Actions 打公开包;这里用同一 tag 再构建一次并写入 GitLab Release。
+# 内网 Runner 连不上 GitHub Release 的附件 CDN,也不在镜像里装 apt 包。
 workflow:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
@@ -6,7 +7,6 @@ workflow:
 stages:
   - release
 
-# 内网 Runner 连不上 GitHub Release 的附件 CDN,所以同一 tag 在这里再构建一次,再写入 Release。
 publish:
   stage: release
   image: node:22-bookworm-slim
@@ -14,11 +14,8 @@ publish:
   timeout: 30m
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
-  before_script:
-    - apt-get update
-    - apt-get install -y --no-install-recommends python3 git zip unzip ca-certificates
   script:
     - npm ci
     - npm run release
     - npm run source-zip
-    - python3 tools/publish-gitlab-release.py
+    - node tools/publish-gitlab-release.mjs

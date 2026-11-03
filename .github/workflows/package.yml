@@ -30,7 +30,6 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           test "$ver" = "$ff" && test "$ver" = "$pkg" && test "$ver" = "$tag"
 
-      - run: sudo apt-get update && sudo apt-get install -y zip unzip
       - run: npm run release
       - run: npm run source-zip
 

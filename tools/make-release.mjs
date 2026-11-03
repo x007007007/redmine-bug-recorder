@@ -3,11 +3,11 @@
 //   bug-recorder-firefox-v{ver}.xpi  (AMO,manifest.firefox.json 作为包内 manifest.json)
 // 构建本身由 build.mjs 完成,这里不再另写一套入口,避免漏文件。
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { cp, mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { zipDir } from './zip-dir.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
@@ -28,8 +28,8 @@ await rm(release, { recursive: true, force: true });
 await mkdir(release, { recursive: true });
 
 /** @param {string} srcDir @param {string} outFile */
-function zipDir(srcDir, outFile) {
-  execFileSync('zip', ['-rq', path.resolve(outFile), '.'], { cwd: srcDir, stdio: 'inherit' });
+function pack(srcDir, outFile) {
+  return zipDir(srcDir, outFile);
 }
 
 /**
@@ -50,8 +50,8 @@ const chromeStage = path.join(root, '.release-chrome-stage');
 const firefoxStage = path.join(root, '.release-ff-stage');
 await stage(chromeStage, 'chrome');
 await stage(firefoxStage, 'firefox');
-zipDir(chromeStage, path.join(release, `bug-recorder-chrome-v${ver}.zip`));
-zipDir(firefoxStage, path.join(release, `bug-recorder-firefox-v${ver}.xpi`));
+await pack(chromeStage, path.join(release, `bug-recorder-chrome-v${ver}.zip`));
+await pack(firefoxStage, path.join(release, `bug-recorder-firefox-v${ver}.xpi`));
 await rm(chromeStage, { recursive: true, force: true });
 await rm(firefoxStage, { recursive: true, force: true });
 
