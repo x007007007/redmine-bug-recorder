@@ -1,16 +1,18 @@
 {
   "name": "redmine-bug-recorder",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "description": "测试助手浏览器插件(Chrome MV3 / Firefox MV3):录制 UI 操作(每步截图)+ API 交互 + Vue/Pinia 状态,勾选 review 后一键提交 Redmine",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tests --noEmit",
+    "test": "tsc -p tests --noEmit && node tools/run-unit.mjs",
     "build": "npm run typecheck && node build.mjs",
     "build:fast": "node build.mjs",
     "watch": "node build.mjs --watch",
     "release": "npm run typecheck && node build.mjs && node tools/make-release.mjs",
     "source-zip": "node tools/make-source-package.mjs",
+    "version:set": "node tools/set-version.mjs",
     "smoke": "node tools/cdp_smoke.mjs 9223 bkeogdmbgodhopooimgmbacldmdmpeap \"$PWD\""
   },
   "devDependencies": {

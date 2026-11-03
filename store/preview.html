@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Bug Recorder store preview</title>
+  <link rel="stylesheet" href="../manager/manager.css" />
+  <style>
+    html, body { height: 100%; overflow: hidden; }
+    main { height: calc(100vh - 64px); }
+    #detail, #submitDock, #sessionAside { max-height: 100%; }
+    #sessionDetail { height: calc(100vh - 100px); overflow: auto; }
+    #bugDescription { height: 120px; }
+  </style>
+</head>
+<body data-dock-side="right" data-dock-collapsed="1">
+  <header>
+    <h1>🐞 Bug Recorder <small>for Redmine</small> <span id="extVer">v0.2.4</span></h1>
+    <span class="chip"><span class="dot"></span><span>未录制</span></span>
+    <button class="primary">● 开始录制</button>
+    <div class="capture-bar">
+      <span class="cap-label">捕获</span>
+      <label class="chk"><input type="checkbox" checked /> 点击</label>
+      <label class="chk"><input type="checkbox" checked /> 截图</label>
+      <label class="chk"><input type="checkbox" checked /> 键盘</label>
+      <label class="chk"><input type="checkbox" checked /> Vue</label>
+      <label class="chk"><input type="checkbox" checked /> Console</label>
+      <label class="chk"><input type="checkbox" checked /> 请求</label>
+      <label class="chk">范围
+        <select><option>当前页</option><option>全局</option></select>
+      </label>
+    </div>
+  </header>
+
+  <main id="workspace">
+    <aside id="sessionAside">
+      <div class="aside-head"><h2>会话列表</h2><button class="ghost">⟳</button></div>
+      <div class="session sel">
+        <div class="t">11-03 15:12:08</div>
+        <div class="s"><span class="status-chip status-submitted">已提交 2 条</span> 步骤 18 · API 6</div>
+        <div class="session-issues">
+          <a>#128 下单后数量没有刷新</a>
+          <a>#131 库存接口返回 500</a>
+        </div>
+      </div>
+      <div class="session">
+        <div class="t">11-03 14:02:41</div>
+        <div class="s"><span class="status-chip status-stopped">已停止</span> 步骤 7 · API 2</div>
+      </div>
+    </aside>
+
+    <section id="detail">
+      <div id="sessionDetail">
+        <div class="detail-head">
+          <h2>11-03 15:12:08 · 订单页</h2>
+          <button class="ghost">导出 JSON</button>
+        </div>
+        <div class="meta">已停止 · 18 步 · 6 个 API · 2 条 Console</div>
+        <div class="issue-history">
+          <div class="issue-links-title">历史提交 2 条</div>
+          <ul>
+            <li><a>#131 库存接口返回 500</a><time>15:18 · 更新过 2 次</time><button type="button">更新这条</button></li>
+            <li><a>#128 下单后数量没有刷新</a><time>15:14</time><button type="button">更新这条</button></li>
+          </ul>
+        </div>
+        <h3>操作时间线</h3>
+        <div class="page-group">
+          <div class="page-head">
+            <input type="checkbox" checked />
+            <span class="page-title">#2 /order/vue.html · 添加订单</span>
+          </div>
+          <div class="step entry">
+            <input class="step-cb" type="checkbox" checked />
+            <span class="entry-time">15:12:21</span>
+            <div class="body">
+              <div class="what">点击「添加订单」</div>
+              <div class="sub">AddOrderForm · <code>#btnAddOrder</code></div>
+            </div>
+            <span class="badge vue">Vue</span>
+          </div>
+          <div class="entry-request">
+            <div class="req bad">
+              <div class="summary" style="display:flex;gap:8px;padding:8px 12px">
+                <span class="method">POST</span>
+                <span class="u">/api/books</span>
+                <span class="status-pill bad">500</span>
+              </div>
+            </div>
+          </div>
+          <div class="entry-log error"><span class="entry-time">15:12:22</span><span>TypeError: qty is not a number</span></div>
+        </div>
+        <div class="page-group">
+          <div class="page-head">
+            <input type="checkbox" checked />
+            <span class="page-title">#1 /order/index.html · 订单列表</span>
+          </div>
+          <div class="step entry">
+            <input class="step-cb" type="checkbox" checked />
+            <span class="entry-time">15:12:11</span>
+            <div class="body">
+              <div class="what">输入数量 2</div>
+              <div class="sub">OrderList · <code>input[name=qty]</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside id="submitDock">
+      <div class="dock-rail">
+        <button type="button" id="btnDockExpand">提交 Bug · 2</button>
+        <button type="button" class="ghost">⇄</button>
+      </div>
+      <div class="dock-body">
+        <div class="dock-head">
+          <b>提交 Bug</b>
+          <span id="dockSel">已选 18 步</span>
+          <button type="button" class="ghost">⇄</button>
+          <button type="button" class="ghost">收起</button>
+          <button type="button">按已选步骤生成描述</button>
+        </div>
+        <form id="bugForm">
+          <label>主题
+            <input value="下单后数量没有刷新，库存接口返回 500" />
+          </label>
+          <div class="row wrap">
+            <label>项目
+              <span class="inline"><select><option>先锋园区</option></select><button type="button" class="ghost">载入</button></span>
+            </label>
+            <label>跟踪
+              <select><option>Bug</option></select>
+            </label>
+            <label>优先级
+              <select><option>高</option></select>
+            </label>
+          </div>
+          <label>描述
+            <textarea id="bugDescription">## 步骤
+1. 打开订单页，数量输入 2
+2. 点击「添加订单」
+3. POST /api/books 返回 500
+4. 列表数量仍显示为 0
+
+Console: TypeError: qty is not a number</textarea>
+          </label>
+          <div class="row wrap">
+            <label class="chk"><input type="checkbox" checked /> 附加每步截图</label>
+            <label class="chk"><input type="checkbox" checked /> 附加 CSV</label>
+            <button type="button" class="primary">更新 #131</button>
+          </div>
+          <div id="updateHint">正在更新 #131：会修改这条工单的主题和描述，并追加附件。</div>
+        </form>
+      </div>
+    </aside>
+  </main>
+  <script>
+    const view = new URLSearchParams(location.search).get('view');
+    if (view === 'submit') {
+      document.body.dataset.dockCollapsed = '0';
+    }
+  </script>
+</body>
+</html>

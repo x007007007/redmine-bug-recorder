@@ -4,7 +4,13 @@
 
 许可:**不可商用**。个人学习、教学、研究和非营利使用可以;商业使用必须先邮件联系作者取得书面授权:`x007007007@hotmail.com`。全文见 [LICENSE](LICENSE)。
 
-版本发布用 git tag `vX.Y.Z`(与 manifest 版本一致)。推送到 GitHub 后,由 GitHub Actions 打包并发布到 GitHub Release。步骤见 [PUBLISHING.md](PUBLISHING.md)。
+版本发布:三处版本号与 git tag `vX.Y.Z` 一致。推到 GitHub `main` 后,Actions 在该 tag 还不存在时自动创建,并发布到 GitHub Release。已有 tag 不会改指向。步骤见 [PUBLISHING.md](PUBLISHING.md)。
+
+文档:
+
+- [需求文档](docs/需求文档.md)
+- [设计文档](docs/设计文档.md)
+- [设计问题](docs/设计问题.md)(已落地、尚未收口的取舍)
 
 ## 功能
 
@@ -55,8 +61,9 @@ Firefox 用 `manifest.firefox.json`(无 `chrome.debugger`,响应体/Console 不�
 
 ```bash
 npm run watch      # 增量构建(改 TS 后刷新扩展即生效)
-npm run typecheck  # 仅类型检查(tsc strict)
-npm run smoke      # 端到端冒烟(40 项断言,需先 build 并启动 demo 两个服务 + CfT 浏览器)
+npm run typecheck  # 类型检查(tsc strict,含 tests/)
+npm test           # 单元测试(文案/时间线/报告/Redmine 客户端,不需要浏览器)
+npm run smoke      # 端到端冒烟(需先 build 并启动 demo 两个服务 + CfT 浏览器)
 ```
 
 ## 配置 Redmine
@@ -126,6 +133,9 @@ devtools/                DevTools 面板:panel(编排)/ panel-state / panel-sess
 background/selection.ts  勾选集合持久化(storage.session,面板 ↔ 提交页共享)
 demo/                    本地演示:普通页 + Vue3+Pinia 页 + 假 Redmine
 tools/cdp_smoke.mjs      端到端冒烟测试(Node 21+ 零依赖,50 项断言,加载 dist/)
+tools/run-unit.mjs       单元测试入口(esbuild 打包 tests/*.test.ts 后 node --test)
+tests/                   不启动浏览器的自动化测试
+docs/                    需求文档、设计文档、设计问题
 tools/make-release.mjs   发布打包(Chrome zip + Firefox xpi → release/)
 tools/gen_icons.py       图标生成
 dist/                    构建产物(浏览器实际加载的目录,gitignore)
@@ -139,7 +149,7 @@ npm run release   # tsc 检查 → 构建 → 产出 release/ 下两个包:
                   #   bug-recorder-firefox-v{ver}.xpi  (AMO,包内已是 firefox manifest)
 ```
 
-版本号在 `manifest.json` / `manifest.firefox.json` 的 `version` 字段,发版前同步递增(两文件保持一致)。
+版本号用 `npm run version:set -- x.y.z` 同时改 `manifest.json`、`manifest.firefox.json`、`package.json`。
 
 ## 本地联调 / 测试
 

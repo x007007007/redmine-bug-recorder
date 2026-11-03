@@ -394,7 +394,7 @@ await evalJs(manager.sessionId, `document.getElementById('bugForm').requestSubmi
 try {
   await waitFor(
     manager.sessionId,
-    `/#101/.test(document.getElementById('submitResult').textContent)`,
+    `/已创建/.test(document.getElementById('submitResult').textContent)`,
     '提交成功',
     30000
   );
