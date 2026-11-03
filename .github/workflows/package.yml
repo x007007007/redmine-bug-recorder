@@ -103,26 +103,22 @@ jobs:
             rel="$GITHUB_REF_NAME"
           fi
           test -n "$rel"
-          # tag 已在上一步或本次 ref 上存在。用 API 建 Release，避免 gh 在浅克隆里再建一次 tag。
+          # 浅克隆默认没有版本 tag。先取回已有 tag，gh 才不会试图把 tag 推到本次提交。
+          if ! git fetch --no-tags origin "refs/tags/${rel}:refs/tags/${rel}" > /tmp/gh-fetch.txt 2>&1; then
+            echo "::error::$(tr '\n' ' ' < /tmp/gh-fetch.txt)"
+            exit 1
+          fi
           gh release delete "$rel" --yes > /tmp/gh-delete.txt 2>&1 || true
-          if ! gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
-            -f tag_name="$rel" \
-            -f name="$rel" \
-            -f body="$notes" \
-            -F make_latest=true > /tmp/gh-create.txt 2>&1; then
+          if ! gh release create "$rel" release/* \
+            --title "$rel" \
+            --notes "$notes" \
+            --latest > /tmp/gh-create.txt 2>&1; then
+            detail=$(tr '\n' ' ' < /tmp/gh-create.txt)
+            echo "::error::${detail}"
             {
               echo '## 创建 Release 失败'
               echo '```'
-              cat /tmp/gh-delete.txt /tmp/gh-create.txt
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          if ! gh release upload "$rel" release/* --clobber >> /tmp/gh-create.txt 2>&1; then
-            {
-              echo '## 上传安装包失败'
-              echo '```'
-              cat /tmp/gh-create.txt
+              cat /tmp/gh-delete.txt /tmp/gh-fetch.txt /tmp/gh-create.txt
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
