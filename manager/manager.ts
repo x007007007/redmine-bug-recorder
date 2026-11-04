@@ -3,13 +3,16 @@
 import { send } from './api';
 import { $, showError, showVersion } from './dom';
 import { store } from './store';
-import { initSettings, loadSettings, loadTrackersAndPriorities } from './settings-ui';
+import { loadSettings, loadTrackersAndPriorities } from './settings-ui';
 import { initReport, regenerateDescription } from './report-ui';
 import { initToolbar, renderAll, setNotifier } from './steps-ui';
 import { refreshSessions, selectSession } from './sessions-ui';
 import { selectionStable } from './selection';
 import { bindCaptureToggles } from './capture-ui';
-import { t } from '../shared/i18n';
+import { bootI18n, t } from '../shared/i18n';
+import { isIssueProvider, providerLabel } from '../shared/tracker';
+
+bootI18n();
 
 async function refreshRecState(): Promise<{ recording: boolean; sessionId: string | null }> {
   const st = await send({ type: 'GET_STATE' });
@@ -34,6 +37,16 @@ $('btnToggleRec').addEventListener('click', () => {
 });
 
 $('btnRefresh').addEventListener('click', () => void refreshSessions());
+$('btnOptions').addEventListener('click', () => {
+  void chrome.runtime.openOptionsPage();
+});
+$('btnImport').addEventListener('click', () => ($('fileImport') as HTMLInputElement).click());
+$('fileImport').addEventListener('change', () => {
+  const input = $('fileImport') as HTMLInputElement;
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (file) void importSessionFile(file);
+});
 $('lightbox').addEventListener('click', () => ($('lightbox').hidden = true));
 
 chrome.runtime.onMessage.addListener((msg: { type?: string; sessionId?: string | null }) => {
@@ -73,12 +86,43 @@ chrome.runtime.onMessage.addListener((msg: { type?: string; sessionId?: string |
   }
 });
 
+function paintTracker(): void {
+  const name = isIssueProvider(store.settings.provider) ? store.settings.provider : 'redmine';
+  const hint = $('trackerHint');
+  const isRedmine = name === 'redmine';
+  hint.classList.toggle('err', !isRedmine);
+  hint.textContent = isRedmine ? t('trackerNow', providerLabel(name)) : t('submitOnlyRedmine', providerLabel(name));
+  ($('btnSubmit') as HTMLButtonElement).disabled = !isRedmine;
+}
+
+async function importSessionFile(file: File): Promise<void> {
+  let data: unknown;
+  try {
+    data = JSON.parse(await file.text());
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      showError(new Error(t('importBad')));
+      return;
+    }
+    throw e;
+  }
+  try {
+    const res = await send({ type: 'IMPORT_SESSION', data });
+    await refreshSessions();
+    await selectSession(res.id);
+    $('err').textContent = t('importOk');
+    $('err').hidden = false;
+  } catch (e) {
+    showError(e);
+  }
+}
+
 (async function init(): Promise<void> {
   try {
     showVersion();
     bindCaptureToggles($('captureBar'));
     await loadSettings();
-    initSettings();
+    paintTracker();
     initReport();
     initToolbar();
     void loadTrackersAndPriorities();

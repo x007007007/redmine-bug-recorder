@@ -1,12 +1,15 @@
 // 会话查询与删除:列表(含计数)、详情、删除会话、按 id 批量删除步骤/请求/Pinia 事件。
 
 import {
+  dbAdd,
   dbAll,
   dbGet,
+  dbPut,
   dbDelete,
   dbListByIndex,
   dbCountByIndex,
 } from '../shared/db';
+import { normalizeImport } from '../shared/import-session';
 import { t } from '../shared/i18n';
 import type { ChangeNote, LogEntry, PiniaEvent, RecordedAction, RecorderSession, RequestEntry, SessionDetail, SessionSummary } from '../shared/types';
 
@@ -35,6 +38,18 @@ export async function getSession(id: string): Promise<SessionDetail> {
   const pinia = (await dbListByIndex<PiniaEvent>('pinia', 'bySession', id)).sort((a, b) => a.ts - b.ts);
   const notes = (await dbListByIndex<ChangeNote>('notes', 'bySession', id)).sort((a, b) => a.ts - b.ts);
   return { session, actions, requests, logs, pinia, notes };
+}
+
+export async function importSession(raw: unknown): Promise<{ id: string }> {
+  const id = crypto.randomUUID();
+  const bundle = normalizeImport(raw, id);
+  await dbPut('sessions', bundle.session);
+  for (const row of bundle.actions) await dbAdd('actions', row);
+  for (const row of bundle.requests) await dbAdd('requests', row);
+  for (const row of bundle.logs) await dbAdd('logs', row);
+  for (const row of bundle.pinia) await dbAdd('pinia', row);
+  for (const row of bundle.notes) await dbAdd('notes', row);
+  return { id };
 }
 
 export async function deleteSession(id: string): Promise<{ ok: true }> {

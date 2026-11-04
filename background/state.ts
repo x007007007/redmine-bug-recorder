@@ -1,7 +1,9 @@
 // 共享状态与工具:录制会话状态(SW 休眠可恢复)、设置读取、徽章、通知。
 
 import { normalizeCapture, type CaptureFlags } from '../shared/capture';
+import { isLocalePref, useLocale } from '../shared/i18n';
 import { normalizeBase } from '../shared/redmine';
+import { isIssueProvider } from '../shared/tracker';
 import type { RecorderSettings, RequestEntry, StateInfo } from '../shared/types';
 
 const SETTINGS_KEY = 'recorderSettings';
@@ -42,6 +44,8 @@ export async function initState(): Promise<void> {
   }
   updateBadge();
   await whenCaptureReady();
+  const { refreshNoteMenu } = await import('./notes');
+  refreshNoteMenu();
 }
 
 export function persistState(): void {
@@ -64,9 +68,27 @@ export function updateBadge(): void {
 
 export async function getSettings(): Promise<RecorderSettings> {
   const o = (await chrome.storage.local.get(SETTINGS_KEY)) as { recorderSettings?: RecorderSettings };
-  const settings = Object.assign({ captureBodies: true, attachScreenshots: true }, o[SETTINGS_KEY] || {});
+  const settings = normalizeSettings(Object.assign({ captureBodies: true, attachScreenshots: true }, o[SETTINGS_KEY] || {}));
   settings.capture = normalizeCapture(settings.capture);
+  if (isLocalePref(settings.locale)) useLocale(settings.locale);
   return settings;
+}
+
+function normalizeSettings(raw: RecorderSettings): RecorderSettings {
+  const provider = isIssueProvider(raw.provider) ? raw.provider : 'redmine';
+  const trackers = { ...(raw.trackers || {}) };
+  if (!trackers.redmine && (raw.redmineUrl || raw.apiKey)) {
+    trackers.redmine = { baseUrl: raw.redmineUrl, token: raw.apiKey };
+  }
+  const redmine = trackers.redmine;
+  return {
+    ...raw,
+    provider,
+    locale: isLocalePref(raw.locale) ? raw.locale : 'auto',
+    trackers,
+    redmineUrl: redmine?.baseUrl ?? raw.redmineUrl,
+    apiKey: redmine?.token ?? raw.apiKey,
+  };
 }
 
 let captureLoaded: Promise<CaptureFlags> | null = null;

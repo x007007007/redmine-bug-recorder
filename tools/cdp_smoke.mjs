@@ -67,10 +67,16 @@ const ok = (name, pass, detail = '') => {
 };
 
 async function newPage(url) {
-  const { targetId } = await cdp.send('Target.createTarget', { url });
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
   await cdp.send('Page.enable', {}, sessionId);
   await cdp.send('Runtime.enable', {}, sessionId);
+  await cdp.send(
+    'Page.addScriptToEvaluateOnNewDocument',
+    { source: `try { if (location.protocol === 'chrome-extension:') localStorage.setItem('bugrec.locale','zh_CN'); } catch (e) {}` },
+    sessionId
+  );
+  await cdp.send('Page.navigate', { url }, sessionId);
   return { targetId, sessionId };
 }
 
@@ -110,9 +116,11 @@ try {
   process.exit(1);
 }
 
-/* 2. 配置假 Redmine 并测试连接 */
+/* 2. 在插件配置页填写假 Redmine 并测试连接 */
+const options = await newPage(`${EXT_BASE}/options/options.html`);
+await waitFor(options.sessionId, `window.__bugrecOptReady === true`, '配置页初始化完成');
 await evalJs(
-  manager.sessionId,
+  options.sessionId,
   `(() => {
     document.getElementById('setUrl').value = 'http://127.0.0.1:8124';
     document.getElementById('setKey').value = 'test-key';
@@ -120,10 +128,10 @@ await evalJs(
     return true;
   })()`
 );
-await waitFor(manager.sessionId, `/已保存/.test(document.getElementById('testResult').textContent)`, '设置保存完成');
-await evalJs(manager.sessionId, `document.getElementById('btnTest').click(); true`);
+await waitFor(options.sessionId, `/已保存/.test(document.getElementById('testResult').textContent)`, '设置保存完成');
+await evalJs(options.sessionId, `document.getElementById('btnTest').click(); true`);
 await waitFor(
-  manager.sessionId,
+  options.sessionId,
   `/连接成功/.test(document.getElementById('testResult').textContent)`,
   'Redmine 测试连接'
 );

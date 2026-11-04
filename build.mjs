@@ -46,6 +46,7 @@ const entries = [
   { in: 'devtools/devtools.ts', out: 'devtools/devtools.js', format: 'iife' },
   { in: 'devtools/panel.ts', out: 'devtools/panel.js', format: 'iife' },
   { in: 'note/note.ts', out: 'note/note.js', format: 'esm' },
+  { in: 'options/options.ts', out: 'options/options.js', format: 'esm' },
 ];
 
 async function copyStatic() {
@@ -58,7 +59,7 @@ async function copyStatic() {
   await cp(path.join(root, 'icons'), path.join(dist, 'icons'), { recursive: true });
   await cp(path.join(root, '_locales'), path.join(dist, '_locales'), { recursive: true });
   // 各页面的 html/css 原样拷贝
-  for (const dir of ['popup', 'manager', 'devtools', 'note']) {
+  for (const dir of ['popup', 'manager', 'devtools', 'note', 'options']) {
     await mkdir(path.join(dist, dir), { recursive: true });
     for (const f of await readdir(path.join(root, dir))) {
       if (f.endsWith('.html') || f.endsWith('.css')) {

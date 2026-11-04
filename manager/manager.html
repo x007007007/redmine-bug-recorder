@@ -10,36 +10,21 @@
     <h1>🐞 Bug Recorder <small>for Redmine</small> <span id="extVer"></span></h1>
     <span class="chip" id="recChip"><span class="dot" id="dot"></span><span id="recText">__MSG_stateIdle__</span></span>
     <button id="btnToggleRec" class="primary">__MSG_btnStart__</button>
+    <button type="button" id="btnOptions" class="ghost">__MSG_btnOptions__</button>
+    <span id="trackerHint"></span>
     <div id="captureBar" class="capture-bar"></div>
     <span id="err" class="err" hidden></span>
   </header>
-
-  <details id="settingsBox">
-    <summary>__MSG_settingsSummary__</summary>
-    <div class="settings-grid">
-      <label>__MSG_labelUrl__
-        <input id="setUrl" placeholder="__MSG_phUrl__" />
-      </label>
-      <label>__MSG_labelKey__
-        <input id="setKey" type="password" placeholder="__MSG_phKey__" />
-      </label>
-      <label class="chk">
-        <input id="setBodies" type="checkbox" />
-        __MSG_labelBodies__
-      </label>
-      <div class="row">
-        <button id="btnSaveSettings">__MSG_btnSaveSettings__</button>
-        <button id="btnTest">__MSG_btnTest__</button>
-        <span id="testResult"></span>
-      </div>
-    </div>
-  </details>
 
   <main id="workspace">
     <aside id="sessionAside">
       <div class="aside-head">
         <h2>__MSG_sessionsHead__</h2>
-        <button id="btnRefresh" class="ghost" title="__MSG_btnRefreshTitle__">⟳</button>
+        <span>
+          <button type="button" id="btnImport" class="ghost">__MSG_btnImport__</button>
+          <input id="fileImport" type="file" accept="application/json,.json" hidden />
+          <button id="btnRefresh" class="ghost" title="__MSG_btnRefreshTitle__">⟳</button>
+        </span>
       </div>
       <div id="sessions"></div>
     </aside>

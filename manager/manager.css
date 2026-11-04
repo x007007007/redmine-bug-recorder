@@ -46,6 +46,8 @@ button.ghost:hover { color: var(--text); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .err { color: var(--accent); font-size: 12px; white-space: pre-wrap; }
+#trackerHint { color: var(--muted); font-size: 12px; }
+#trackerHint.err { color: var(--accent); }
 
 #settingsBox { background: #fff; border-bottom: 1px solid var(--line); padding: 10px 22px; }
 #settingsBox summary { cursor: pointer; color: var(--muted); font-size: 13px; }

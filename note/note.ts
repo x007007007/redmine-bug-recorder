@@ -1,7 +1,9 @@
 // 修改意见窗口：扩展自己的弹出窗口，不插入被测页面。
 
 import { send } from '../manager/api';
-import { t } from '../shared/i18n';
+import { bootI18n, t } from '../shared/i18n';
+
+bootI18n();
 import { NOTE_DRAFT_KEY } from '../shared/types';
 import type { NoteDraft } from '../shared/types';
 

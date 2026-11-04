@@ -1,7 +1,6 @@
 // DevTools「Bug Recorder」面板:会话列表(切换/删除)、时间轴缩略图、大步骤勾选
 //(与提交页经 storage.session 实时同步)、选范围提交。
 
-import { t } from '../shared/i18n';
 import { send } from '../manager/api';
 import { bindCaptureToggles } from '../manager/capture-ui';
 import { $, showVersion } from '../manager/dom';
@@ -20,7 +19,10 @@ import {
   updateSelSummary,
 } from './panel-view';
 import type { CaptureView } from '../shared/timeline';
+import { bootI18n, t } from '../shared/i18n';
 import type { SessionSummary, StateInfo, SubmitRange } from '../shared/types';
+
+bootI18n();
 
 function init(): void {
   showVersion();
@@ -33,6 +35,7 @@ function init(): void {
     })();
   });
   $('btnOpenMgr').addEventListener('click', openManager);
+  $('btnOptions').addEventListener('click', () => void chrome.runtime.openOptionsPage());
   $('rangeMode').addEventListener('change', () => {
     panelState.rangeMode = ($('rangeMode') as HTMLInputElement).checked;
     clearRange();

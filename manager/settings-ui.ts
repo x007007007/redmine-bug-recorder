@@ -1,57 +1,12 @@
-// 设置区:Redmine 地址 / API Key / 捕获选项 / 连接测试 / 跟踪与优先级下拉。
+// 提交页用到的设置读取,以及 Redmine 项目/跟踪/优先级下拉。连接表单在插件配置页。
 
 import { send } from './api';
 import { $, showError, fillSelect } from './dom';
 import { store } from './store';
 import { t } from '../shared/i18n';
-import type { RecorderSettings, RedmineUser } from '../shared/types';
 
 export async function loadSettings(): Promise<void> {
   store.settings = await send({ type: 'SETTINGS_GET' });
-  ($('setUrl') as HTMLInputElement).value = store.settings.redmineUrl || '';
-  ($('setKey') as HTMLInputElement).value = store.settings.apiKey || '';
-  ($('setBodies') as HTMLInputElement).checked = store.settings.captureBodies !== false;
-}
-
-function readSettingsInput(): RecorderSettings {
-  return {
-    ...store.settings,
-    redmineUrl: ($('setUrl') as HTMLInputElement).value.trim(),
-    apiKey: ($('setKey') as HTMLInputElement).value.trim(),
-    captureBodies: ($('setBodies') as HTMLInputElement).checked,
-  };
-}
-
-export function initSettings(): void {
-  $('btnSaveSettings').addEventListener('click', onSave);
-  $('btnTest').addEventListener('click', onTest);
-  void loadTrackersAndPriorities();
-}
-
-async function onSave(): Promise<void> {
-  store.settings = readSettingsInput();
-  try {
-    await send({ type: 'SETTINGS_SET', settings: store.settings });
-    $('testResult').textContent = t('saved');
-    window.setTimeout(() => ($('testResult').textContent = ''), 3000);
-  } catch (e) {
-    showError(e);
-  }
-}
-
-async function onTest(): Promise<void> {
-  $('testResult').textContent = t('connecting');
-  try {
-    const tmp: RecorderSettings = {
-      redmineUrl: ($('setUrl') as HTMLInputElement).value.trim(),
-      apiKey: ($('setKey') as HTMLInputElement).value.trim(),
-    };
-    const info: RedmineUser = await send({ type: 'TEST_REDMINE', settings: tmp });
-    $('testResult').textContent = t('connected', [info.login, info.name]);
-  } catch (e) {
-    $('testResult').textContent = '';
-    showError(e);
-  }
 }
 
 export async function loadTrackersAndPriorities(): Promise<void> {

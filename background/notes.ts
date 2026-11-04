@@ -8,6 +8,11 @@ import type { ChangeNote, NoteDraft } from '../shared/types';
 
 const MENU_ID = 'bugrec-note';
 
+export function refreshNoteMenu(): void {
+  if (typeof chrome.contextMenus === 'undefined') return;
+  chrome.contextMenus.update(MENU_ID, { title: t('noteTitle') }, () => void chrome.runtime.lastError);
+}
+
 export function installNotes(): void {
   if (typeof chrome.contextMenus === 'undefined') return;
   chrome.contextMenus.onClicked.addListener(onMenu);

@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>__MSG_optPageTitle__</title>
+  <link rel="stylesheet" href="../manager/manager.css" />
+  <style>
+    main { display: block; max-width: 720px; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px 18px; }
+    .card h2 { font-size: 15px; margin-bottom: 8px; }
+    .hint { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+    .settings-grid label.chk { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🐞 Bug Recorder <span id="extVer"></span></h1>
+    <button type="button" id="btnRecords" class="primary">__MSG_btnRecords__</button>
+    <span id="err" class="err" hidden></span>
+  </header>
+  <main>
+    <section class="card">
+      <h2>__MSG_optPageTitle__</h2>
+      <p class="hint">__MSG_providerHint__</p>
+      <div class="settings-grid">
+        <label>__MSG_localeLabel__
+          <select id="setLocale">
+            <option value="auto">__MSG_localeAuto__</option>
+            <option value="zh_CN">__MSG_localeZh__</option>
+            <option value="en">__MSG_localeEn__</option>
+          </select>
+        </label>
+        <label>__MSG_providerLabel__
+          <select id="setProvider">
+            <option value="redmine">__MSG_providerRedmine__</option>
+            <option value="jira">__MSG_providerJira__</option>
+            <option value="feishu">__MSG_providerFeishu__</option>
+            <option value="tapd">__MSG_providerTapd__</option>
+            <option value="gitlab">__MSG_providerGitlab__</option>
+            <option value="github">__MSG_providerGithub__</option>
+            <option value="gitee">__MSG_providerGitee__</option>
+          </select>
+        </label>
+        <label id="labUrl"><span id="labUrlText">__MSG_labelUrl__</span>
+          <input id="setUrl" placeholder="__MSG_phUrl__" />
+        </label>
+        <label id="labAccount" hidden><span>__MSG_labelAccount__</span>
+          <input id="setAccount" placeholder="__MSG_phAccount__" />
+        </label>
+        <label id="labKey"><span id="labKeyText">__MSG_labelKey__</span>
+          <input id="setKey" type="password" placeholder="__MSG_phKey__" />
+        </label>
+        <label id="labProject" hidden><span>__MSG_labelRepo__</span>
+          <input id="setProject" placeholder="__MSG_phRepo__" />
+        </label>
+        <label class="chk">
+          <input id="setBodies" type="checkbox" />
+          __MSG_labelBodies__
+        </label>
+        <div class="row">
+          <button type="button" id="btnSaveSettings">__MSG_btnSaveSettings__</button>
+          <button type="button" id="btnTest">__MSG_btnTest__</button>
+          <span id="testResult"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="options.js" type="module"></script>
+</body>
+</html>

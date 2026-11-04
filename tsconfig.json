@@ -14,5 +14,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["shared/**/*.ts", "content/**/*.ts", "background/**/*.ts", "popup/**/*.ts", "manager/**/*.ts", "devtools/**/*.ts", "note/**/*.ts"]
+  "include": ["shared/**/*.ts", "content/**/*.ts", "background/**/*.ts", "popup/**/*.ts", "manager/**/*.ts", "devtools/**/*.ts", "note/**/*.ts", "options/**/*.ts"]
 }

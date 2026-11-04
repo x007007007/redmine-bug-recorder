@@ -4,7 +4,9 @@ import { send } from '../manager/api';
 import { bindCaptureToggles } from '../manager/capture-ui';
 import { $, showError, showVersion } from '../manager/dom';
 import { fmtTime } from '../shared/describe';
-import { t } from '../shared/i18n';
+import { bootI18n, t } from '../shared/i18n';
+
+bootI18n();
 import type { SessionSummary, StateInfo } from '../shared/types';
 
 function refresh(): void {
@@ -86,6 +88,11 @@ $('btnToggle').addEventListener('click', () => {
 
 $('btnManager').addEventListener('click', () => {
   void chrome.tabs.create({ url: chrome.runtime.getURL('manager/manager.html') });
+  window.close();
+});
+
+$('btnOptions').addEventListener('click', () => {
+  void chrome.runtime.openOptionsPage();
   window.close();
 });
 

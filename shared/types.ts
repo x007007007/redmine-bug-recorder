@@ -138,7 +138,24 @@ export interface RecorderSession {
   submissions?: IssueLink[];
 }
 
+export const ISSUE_PROVIDERS = ['redmine', 'jira', 'feishu', 'tapd', 'gitlab', 'github', 'gitee'] as const;
+export type IssueProvider = (typeof ISSUE_PROVIDERS)[number];
+
+/** 某个平台的连接信息。目前只有 Redmine 会用来提交。 */
+export interface TrackerAccount {
+  baseUrl?: string;
+  token?: string;
+  account?: string;
+  project?: string;
+}
+
 export interface RecorderSettings {
+  /** auto 跟随浏览器;显式选择后界面和报告都用该语言 */
+  locale?: 'auto' | 'zh_CN' | 'en';
+  /** 准备提交到哪个平台。缺省是 redmine */
+  provider?: IssueProvider;
+  /** 各平台各自保存,切换时不互相覆盖 */
+  trackers?: Partial<Record<IssueProvider, TrackerAccount>>;
   redmineUrl?: string;
   apiKey?: string;
   captureBodies?: boolean;
@@ -226,6 +243,7 @@ export interface ResultMap {
   GET_SELECTION: { sessionId: string; ids: number[] | null };
   SET_SELECTION: { ok: true };
   DELETE_SESSION: { ok: true };
+  IMPORT_SESSION: { id: string };
   DELETE_ITEMS: { ok: true; removed: number };
   SETTINGS_GET: RecorderSettings;
   SETTINGS_SET: { ok: true };

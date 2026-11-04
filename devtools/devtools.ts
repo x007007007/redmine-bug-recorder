@@ -5,6 +5,10 @@
 // 相对路径在 Firefox 会按 devtools 页面所在目录解析,导致面板 404 白屏。
 // 构建为 IIFE 经典脚本(devtools_page 要求)。
 
+import { bootI18n } from '../shared/i18n';
+
+bootI18n();
+
 try {
   const api = ((typeof browser !== 'undefined' ? browser : chrome) as unknown as {
     devtools?: { panels?: { create: (title: string, icon: string, page: string) => void } };

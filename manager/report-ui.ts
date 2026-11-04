@@ -10,6 +10,7 @@ import type { IssueLink, RecorderSession } from '../shared/types';
 import { selectedActions } from './steps-ui';
 import { buildCsv } from './export-csv';
 import { t } from '../shared/i18n';
+import { isIssueProvider, providerLabel } from '../shared/tracker';
 
 const DOCK_KEY = 'bugrec.submitDock';
 
@@ -89,6 +90,11 @@ async function onCopy(): Promise<void> {
 async function onSubmit(e: Event): Promise<void> {
   e.preventDefault();
   if (!store.cache) return;
+  const provider = isIssueProvider(store.settings.provider) ? store.settings.provider : 'redmine';
+  if (provider !== 'redmine') {
+    showError(new Error(t('submitOnlyRedmine', providerLabel(provider))));
+    return;
+  }
   const projectId = ($('bugProjectManual') as HTMLInputElement).value.trim() || ($('bugProject') as HTMLSelectElement).value;
   if (!updatingIssueId && !projectId) {
     showError(new Error(t('needProject')));

@@ -55,7 +55,7 @@
   },
 
   "options_ui": {
-    "page": "manager/manager.html",
+    "page": "options/options.html",
     "open_in_tab": true
   },
 

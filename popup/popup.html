@@ -16,7 +16,7 @@
     button { width: 100%; padding: 8px 0; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; }
     #btnToggle { background: var(--accent); color: #fff; font-weight: 600; }
     #btnToggle.stop { background: #5f6368; }
-    #btnManager { background: #e8eaed; color: #202124; margin-top: 8px; }
+    #btnManager, #btnOptions { background: #e8eaed; color: #202124; margin-top: 8px; }
     .capture-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 8px 0; font-size: 12px; }
     .capture-bar .cap-label { color: #5f6368; font-weight: 600; }
     .capture-bar .chk { display: flex; align-items: center; gap: 3px; cursor: pointer; }
@@ -41,7 +41,8 @@
   <div id="captureBar" class="capture-bar"></div>
   <div class="sessions-head"><b>__MSG_sessionsHead__</b></div>
   <div id="sessionList"><div class="empty">__MSG_sessionsLoading__</div></div>
-  <button id="btnManager">__MSG_btnManager__</button>
+  <button id="btnManager">__MSG_btnRecords__</button>
+  <button id="btnOptions">__MSG_btnOptions__</button>
   <div class="err" id="err" hidden></div>
   <div class="hint">__MSG_popupHint__</div>
   <script src="popup.js" type="module"></script>
