@@ -35,15 +35,9 @@ export function describeAction(a: RecordedAction): string {
     case 'navigate':
       return t('actionNavigate', a.url);
     case 'click':
-      return t('actionClick', a.label || a.selector || t('labelElement'));
+      return t('actionClick', targetName(a, 'labelElement'));
     case 'input':
-      if (a.inputType === 'keyboard') return t('actionInput', [a.label || a.selector || t('labelInput'), JSON.stringify(a.value)]);
-      if (a.inputType === 'select') return t('actionSelect', [a.label || a.selector || t('labelSelect'), JSON.stringify(a.value)]);
-      if (a.inputType === 'checkbox' || a.inputType === 'radio') {
-        const name = a.label || a.selector || '';
-        return a.value === '选中' ? t('actionCheck', name) : t('actionUncheck', name);
-      }
-      return t('actionInput', [a.label || a.selector || '', JSON.stringify(a.value)]);
+      return describeInput(a);
     case 'keypress':
       return t('actionKey', [a.key === 'Enter' ? t('keyEnter') : a.key || '', a.label || a.selector || '']);
     case 'submit':
@@ -53,13 +47,33 @@ export function describeAction(a: RecordedAction): string {
   }
 }
 
-/** 元素定位:Vue 组件 + props + HTML 提示,给修改意见用 */
+/** 步骤的主体名:label → selector → 兜底文案 */
+function targetName(a: RecordedAction, fallbackKey: string): string {
+  return a.label || a.selector || t(fallbackKey);
+}
+
+function describeInput(a: RecordedAction): string {
+  const name = a.label || a.selector || '';
+  if (a.inputType === 'select') return t('actionSelect', [targetName(a, 'labelSelect'), JSON.stringify(a.value)]);
+  if (a.inputType === 'checkbox' || a.inputType === 'radio') {
+    return a.value === '选中' ? t('actionCheck', name) : t('actionUncheck', name);
+  }
+  if (a.inputType === 'keyboard') return t('actionInput', [targetName(a, 'labelInput'), JSON.stringify(a.value)]);
+  return t('actionInput', [name, JSON.stringify(a.value)]);
+}
+
+/** 组件信息徽标前缀:按探针识别的框架显示;历史数据无 framework 字段按 Vue 处理 */
+export function frameLabel(info: { framework?: 'vue' | 'react' | null } | null | undefined): string {
+  return info?.framework === 'react' ? 'React' : 'Vue';
+}
+
+/** 元素定位:组件(框架名) + props + HTML 提示,给修改意见用 */
 export function describeElement(note: ChangeNote): string {
   const bits: string[] = [];
   const vue = note.vue;
   if (vue && vue.component) {
     const chain = vue.chain && vue.chain.length > 1 ? ` (${vue.chain.join(' > ')})` : '';
-    bits.push(`Vue ${vue.component}${chain}`);
+    bits.push(`${frameLabel(vue)} ${vue.component}${chain}`);
   }
   if (vue && vue.props) bits.push(`props ${clip(vue.props, 180)}`);
   if (note.htmlHint) bits.push(note.htmlHint);

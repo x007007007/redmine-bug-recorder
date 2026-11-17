@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { esc } from '../manager/dom';
 import { truncate } from '../content/dom-meta';
-import { safeStringify, serializeProps } from '../content/probe-serialize';
+import { safeStringify, serializeProps, serializePropsObject } from '../content/probe-serialize';
 
 test('序列化有深度和长度上限，函数与错误不展开', () => {
   assert.equal(safeStringify(undefined), 'undefined');
@@ -25,12 +25,32 @@ test('循环引用不会撑爆调用栈', () => {
   assert.equal(text.includes('[序列化失败]') || text.includes('[…]'), true);
 });
 
+test('大 Map/Set 只展开前几项,不拷贝整个容器', () => {
+  const bigMap = new Map(Array.from({ length: 5000 }, (_, i) => [String(i), i]));
+  const text = safeStringify(bigMap);
+  assert.match(text, /^Map\(5000\)\{/);
+  assert.equal(text.length < 500, true);
+  const bigSet = new Set(Array.from({ length: 5000 }, (_, i) => i));
+  const setText = safeStringify(bigSet);
+  assert.match(setText, /^Set\(5000\)\{/);
+  assert.equal(setText.length < 300, true);
+});
+
 test('Vue3 props 收成有界 JSON，空 props 返回空', () => {
   assert.equal(serializeProps(null), null);
   assert.equal(serializeProps({ props: {} } as never), null);
   const json = serializeProps({ props: { title: '三体', count: 2 } } as never);
   assert.equal(json?.includes('"title"'), true);
   assert.equal(json?.includes('三体'), true);
+});
+
+test('React props 对象收成有界 JSON,空/缺 props 返回空', () => {
+  assert.equal(serializePropsObject(null), null);
+  assert.equal(serializePropsObject({}), null);
+  const json = serializePropsObject({ orderId: 7, rows: [1, 2, 3], onSave: () => {} });
+  assert.equal(json?.includes('"orderId"'), true);
+  assert.equal(json?.includes('"rows"'), true);
+  assert.match(json!, /\[fn /); // 函数不展开
 });
 
 test('界面转义和值截断', () => {

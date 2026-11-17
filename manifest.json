@@ -30,7 +30,7 @@
     },
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content/vue-probe.js"],
+      "js": ["content/framework-probe.js"],
       "run_at": "document_start",
       "world": "MAIN",
       "all_frames": true

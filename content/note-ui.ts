@@ -1,9 +1,9 @@
 // 右键「记录修改意见」:只记住被点中的元素。表单由后台打开扩展窗口，不插入页面。
 
 import { cssPath, fieldLabel, textOf } from './dom-meta';
-import type { NoteDraft, VueInfo } from '../shared/types';
+import type { NoteDraft, FrameInfo } from '../shared/types';
 
-export function installNoteCapture(readVue: (el: Element) => VueInfo | null): void {
+export function installNoteCapture(readFrame: (el: Element) => FrameInfo | null): void {
   let draft: NoteDraft | null = null;
 
   document.addEventListener(
@@ -11,7 +11,7 @@ export function installNoteCapture(readVue: (el: Element) => VueInfo | null): vo
     (ev) => {
       const el = ev.target;
       if (!(el instanceof Element)) return;
-      draft = readDraft(el, readVue);
+      draft = readDraft(el, readFrame);
     },
     true
   );
@@ -22,7 +22,7 @@ export function installNoteCapture(readVue: (el: Element) => VueInfo | null): vo
   });
 }
 
-function readDraft(el: Element, readVue: (el: Element) => VueInfo | null): NoteDraft {
+function readDraft(el: Element, readFrame: (el: Element) => FrameInfo | null): NoteDraft {
   const label = fieldLabel(el) || textOf(el);
   return {
     url: location.href,
@@ -30,7 +30,7 @@ function readDraft(el: Element, readVue: (el: Element) => VueInfo | null): NoteD
     selector: cssPath(el),
     label,
     htmlHint: htmlHint(el, label),
-    vue: readVue(el),
+    vue: readFrame(el),
   };
 }
 

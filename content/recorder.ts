@@ -1,5 +1,5 @@
 // 录制器内容脚本(隔离世界):捕获点击 / 键盘输入(防抖) / 下拉 / 表单提交,
-// 经 CustomEvent 向主世界探针请求 Vue/Pinia 信息后一并发给后台。
+// 经 CustomEvent 向主世界探针请求 Vue/React/Pinia 信息后一并发给后台。
 // 值不脱敏(提交前由测试人员 review),仅做长度截断。构建时打包为单个 IIFE 经典脚本。
 
 import { t } from '../shared/i18n';
@@ -7,7 +7,7 @@ import { drainQueue, readVue } from './bridge';
 import { truncate, textOf, fieldLabel, cssPath } from './dom-meta';
 import { captureFlags, watchCaptureFlags } from './capture-flags';
 import { installNoteCapture } from './note-ui';
-import type { RecordedAction, VueInfo } from '../shared/types';
+import type { RecordedAction, FrameInfo } from '../shared/types';
 
 function install(): void {
   const w = window as unknown as Record<string, unknown>;
@@ -24,27 +24,26 @@ function install(): void {
       ts: Date.now(),
       selector: el ? cssPath(el) : '',
       label: el ? fieldLabel(el) || textOf(el) : '',
-      vue: captureFlags().isVueEnabled ? collectVueInfo(el) : null,
+      vue: captureFlags().isVueEnabled ? collectFrameInfo(el) : null,
     };
   }
 
-  // 同步一轮 CustomEvent:设置标记 → 请求探针 → 接收结果
+  // 同步一轮 CustomEvent:清旧标记 → 打标 → 请求探针 → 接收结果
   let probeSeq = 0;
-  function collectVueInfo(el: Element | null): VueInfo | null {
+  function collectFrameInfo(el: Element | null): FrameInfo | null {
     if (!el || !el.setAttribute) return null;
-    const id = 'v' + ++probeSeq;
-    let info: VueInfo | null = null;
+    let info: FrameInfo | null = null;
     const onInfo = (): void => {
-      info = readVue<VueInfo>();
+      info = readVue<FrameInfo>();
     };
     try {
-      el.setAttribute('data-bugrec-eid', id);
-      // detail 经隔离世界分发在 Firefox 页面侧不可读：同步经 window 透传 id 兜底
-      (window as unknown as Record<string, unknown>).__bugrecProbeId = id;
+      // 探针取"最后一个带标记的元素":先清掉历史标记,保证本次目标唯一
+      for (const stale of document.querySelectorAll('[data-bugrec-eid]')) stale.removeAttribute('data-bugrec-eid');
+      el.setAttribute('data-bugrec-eid', 'v' + ++probeSeq);
       document.addEventListener('bugrec:vue-info', onInfo, { once: true });
-      document.dispatchEvent(new CustomEvent('bugrec:probe', { detail: { id } }));
+      document.dispatchEvent(new CustomEvent('bugrec:probe'));
       document.removeEventListener('bugrec:vue-info', onInfo);
-      if (!info) info = readVue<VueInfo>();
+      if (!info) info = readVue<FrameInfo>();
     } catch {
       /* 探针不可用时静默降级 */
     }
@@ -94,19 +93,24 @@ function install(): void {
     true
   );
 
+  /* 点击到的控件值:select / checkbox / radio / file / 文本,提交按钮不算值 */
   function clickValue(el: Element): Partial<RecordedAction> | null {
-    if (el instanceof HTMLSelectElement) {
-      const opt = el.selectedOptions && el.selectedOptions[0];
-      return { inputType: 'select', value: truncate(opt ? opt.textContent : el.value, 80) };
-    }
-    if (el instanceof HTMLInputElement) {
-      if (el.type === 'checkbox' || el.type === 'radio') return { inputType: el.type, value: el.checked ? '选中' : '取消' };
-      if (el.type === 'submit' || el.type === 'button' || el.type === 'image') return null;
-      if (el.type === 'file') return { inputType: 'file', value: t('fileValue') };
-      return { inputType: el.type || 'text', value: truncate(el.value) };
-    }
+    if (el instanceof HTMLSelectElement) return selectValue(el);
+    if (el instanceof HTMLInputElement) return inputValue(el);
     if (el instanceof HTMLTextAreaElement) return { inputType: 'textarea', value: truncate(el.value) };
     return null;
+  }
+
+  function selectValue(el: HTMLSelectElement): Partial<RecordedAction> {
+    const opt = el.selectedOptions && el.selectedOptions[0];
+    return { inputType: 'select', value: truncate(opt ? opt.textContent : el.value, 80) };
+  }
+
+  function inputValue(el: HTMLInputElement): Partial<RecordedAction> | null {
+    if (el.type === 'checkbox' || el.type === 'radio') return { inputType: el.type, value: el.checked ? '选中' : '取消' };
+    if (el.type === 'submit' || el.type === 'button' || el.type === 'image') return null;
+    if (el.type === 'file') return { inputType: 'file', value: t('fileValue') };
+    return { inputType: el.type || 'text', value: truncate(el.value) };
   }
 
   /* 键盘输入(防抖合并)+ 回车/Esc 单独记一步 */
@@ -120,8 +124,8 @@ function install(): void {
       if (!captureFlags().isKeyboardEnabled || isOwnUi(e)) return;
       const el = e.target;
       if (!(el instanceof HTMLElement) || !el.matches(TEXT_INPUT)) return;
-      const t = pending.get(el);
-      if (t) clearTimeout(t);
+      const timer = pending.get(el);
+      if (timer) clearTimeout(timer);
       pending.set(
         el,
         setTimeout(() => {
@@ -139,9 +143,9 @@ function install(): void {
   }
 
   function flushPending(el: HTMLElement): void {
-    const t = pending.get(el);
-    if (!t) return;
-    clearTimeout(t);
+    const timer = pending.get(el);
+    if (!timer) return;
+    clearTimeout(timer);
     pending.delete(el);
     recordKeyboard(el);
   }
@@ -167,13 +171,7 @@ function install(): void {
       if (isOwnUi(e)) return;
       const el = e.target;
       if (!(el instanceof HTMLSelectElement)) return;
-      const opt = el.selectedOptions && el.selectedOptions[0];
-      send(
-        Object.assign(
-          { kind: 'input' as const, inputType: 'select', value: truncate(opt ? opt.textContent : el.value, 80) },
-          baseMeta(el)
-        )
-      );
+      send(Object.assign({ kind: 'input' as const, inputType: 'select' }, selectValue(el), baseMeta(el)));
     },
     true
   );
@@ -185,41 +183,52 @@ function install(): void {
       if (isOwnUi(e)) return;
       const form = e.target;
       if (!(form instanceof Element)) return;
-      const fields: string[] = [];
-      try {
-        form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select').forEach((f) => {
-          if (f.type === 'file') return;
-          fields.push(`${fieldLabel(f) || cssPath(f)}=${truncate(f.value, 200)}`);
-        });
-      } catch {
-        /* 复杂表单取值失败忽略 */
-      }
-      send(Object.assign({ kind: 'submit' as const, value: truncate(fields.join('; '), 600) }, baseMeta(form)));
+      send(Object.assign({ kind: 'submit' as const, value: truncate(formFields(form), 600) }, baseMeta(form)));
     },
     true
   );
 
-  installNoteCapture((el) => (captureFlags().isVueEnabled ? collectVueInfo(el) : null));
+  function formFields(form: Element): string {
+    const fields: string[] = [];
+    try {
+      form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select').forEach((f) => {
+        if (f.type === 'file') return;
+        fields.push(`${fieldLabel(f) || cssPath(f)}=${truncate(f.value, 200)}`);
+      });
+    } catch {
+      /* 复杂表单取值失败忽略 */
+    }
+    return fields.join('; ');
+  }
+
+  installNoteCapture((el) => (captureFlags().isVueEnabled ? collectFrameInfo(el) : null));
+
+  /* 桥接队列:console / pinia 异步消息发后台 */
+  type BridgeItem =
+    | { channel: 'console'; level?: string; text?: string }
+    | { channel: 'pinia'; event?: Record<string, unknown> };
+
+  function postMessage(payload: Record<string, unknown>): void {
+    try {
+      const p = chrome.runtime.sendMessage(payload);
+      if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {});
+    } catch {
+      /* 扩展重载后旧页面发送失败 */
+    }
+  }
+
+  function sendBridgeItem(item: BridgeItem): void {
+    if (item.channel === 'console') {
+      if (!captureFlags().isConsoleEnabled || !item.text) return;
+      postMessage({ type: 'REC_LOG', level: item.level, text: item.text });
+    } else if (item.channel === 'pinia') {
+      if (!captureFlags().isVueEnabled || !item.event) return;
+      postMessage({ type: 'REC_PINIA', event: item.event });
+    }
+  }
 
   const flushBridge = (): void => {
-    type BridgeItem =
-      | { channel: 'console'; level?: string; text?: string }
-      | { channel: 'pinia'; event?: Record<string, unknown> };
-    for (const item of drainQueue<BridgeItem>()) {
-      try {
-        if (item.channel === 'console') {
-          if (!captureFlags().isConsoleEnabled || !item.text) continue;
-          const p = chrome.runtime.sendMessage({ type: 'REC_LOG', level: item.level, text: item.text });
-          if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {});
-        } else if (item.channel === 'pinia') {
-          if (!captureFlags().isVueEnabled || !item.event) continue;
-          const p = chrome.runtime.sendMessage({ type: 'REC_PINIA', event: item.event });
-          if (p && typeof (p as Promise<unknown>).catch === 'function') (p as Promise<unknown>).catch(() => {});
-        }
-      } catch {
-        /* 扩展重载后旧页面发送失败 */
-      }
-    }
+    for (const item of drainQueue<BridgeItem>()) sendBridgeItem(item);
   };
   document.addEventListener('bugrec:bridge', flushBridge);
   flushBridge();

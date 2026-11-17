@@ -15,6 +15,7 @@ if (!port || !extId) {
 }
 const REPO = repoRootArg || process.cwd();
 const FAKE_STORE = path.join(REPO, 'demo', '.fake-redmine');
+fs.rmSync(FAKE_STORE, { recursive: true, force: true }); // 每轮从零开始,截图/CSV 数量断言才可复现
 const EXT_BASE = `chrome-extension://${extId}`;
 const DEMO = 'http://127.0.0.1:8123';
 
@@ -71,11 +72,9 @@ async function newPage(url) {
   const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
   await cdp.send('Page.enable', {}, sessionId);
   await cdp.send('Runtime.enable', {}, sessionId);
-  await cdp.send(
-    'Page.addScriptToEvaluateOnNewDocument',
-    { source: `try { if (location.protocol === 'chrome-extension:') localStorage.setItem('bugrec.locale','zh_CN'); } catch (e) {}` },
-    sessionId
-  );
+  // 注意:不要往 localStorage 强塞 locale——i18n 会因 localStorage 与 storage 的
+  // locale 不一致而 location.reload(),与注入互相触发成无限重载循环。
+  // 语言统一走产品路径:第 2 步在配置页把「界面语言」选成 zh_CN 并保存。
   await cdp.send('Page.navigate', { url }, sessionId);
   return { targetId, sessionId };
 }
@@ -94,12 +93,14 @@ async function evalJs(sessionId, expression) {
 
 async function waitFor(sessionId, expr, label, timeoutMs = 10000) {
   const start = Date.now();
+  let lastVal;
   while (Date.now() - start < timeoutMs) {
-    const v = await evalJs(sessionId, expr).catch(() => false);
-    if (v) return true;
+    const v = await evalJs(sessionId, expr).catch((e) => ({ evalError: String(e.message).slice(0, 120) }));
+    if (v === true) return true;
+    if (v !== false) lastVal = v;
     await new Promise((r) => setTimeout(r, 250));
   }
-  throw new Error(`等待超时: ${label}`);
+  throw new Error(`等待超时: ${label}(最后观测: ${JSON.stringify(lastVal)})`);
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -124,11 +125,22 @@ await evalJs(
   `(() => {
     document.getElementById('setUrl').value = 'http://127.0.0.1:8124';
     document.getElementById('setKey').value = 'test-key';
+    const locale = document.getElementById('setLocale');
+    if (locale) locale.value = 'zh_CN'; // 断言按中文文案;走产品路径持久化,避免 locale 不一致触发重载
     document.getElementById('btnSaveSettings').click();
     return true;
   })()`
 );
-await waitFor(options.sessionId, `/已保存/.test(document.getElementById('testResult').textContent)`, '设置保存完成');
+// 首次保存会把语言切到 zh_CN 并按设计刷新页面,等 storage 落盘 + 页面重新初始化
+await waitFor(
+  options.sessionId,
+  `(async () => {
+    const s = ((await chrome.storage.local.get('recorderSettings')).recorderSettings) || {};
+    return s.redmineUrl === 'http://127.0.0.1:8124' && s.apiKey === 'test-key';
+  })()`,
+  '设置保存完成'
+);
+await waitFor(options.sessionId, `window.__bugrecOptReady === true`, '配置页重载完成');
 await evalJs(options.sessionId, `document.getElementById('btnTest').click(); true`);
 await waitFor(
   options.sessionId,

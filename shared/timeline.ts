@@ -3,7 +3,7 @@
 
 import { describeAction } from './describe';
 import { t } from './i18n';
-import type { ChangeNote, LogEntry, PageGroup, PiniaEvent, RecordedAction, RequestEntry, TimelineEntry } from './types';
+import type { ActionKind, ChangeNote, LogEntry, PageGroup, PiniaEvent, RecordedAction, RequestEntry, TimelineEntry } from './types';
 
 type PageRaw = {
   url: string;
@@ -36,6 +36,33 @@ export function buildPages(
   logs: LogEntry[] = [],
   notes: ChangeNote[] = []
 ): PageGroup[] {
+  const pages = collectPages(actions);
+
+  // 页面时间窗:[startTs_i, startTs_{i+1}),请求/事件按 ts 归属页面
+  const windows = pages.map((p, i) => [p.startTs, i + 1 < pages.length ? pages[i + 1]!.startTs : Infinity] as const);
+  const buckets: TimelineEntry[][] = pages.map(() => []);
+  const into = (type: TimelineEntry['type'], data: TimelineEntry['data'], ts: number): void => {
+    buckets[windowIndexOf(ts, windows)]!.push({ type, ts, data, ownerStepIdx: -1 } as TimelineEntry);
+  };
+  for (const a of actions) into('action', a, a.ts);
+  for (const r of requests) into('request', r, r.ts);
+  for (const ev of piniaEvents) into('pinia', ev, ev.ts);
+  for (const log of logs) into('log', log, log.ts);
+  for (const note of notes) into('note', note, note.ts);
+
+  finalizePages(pages, buckets);
+  return pages.map((p, i) => ({
+    ...p,
+    key: `p${i}`,
+    orderIndex: i + 1,
+    entries: p.entries ?? [],
+    startTime: p.startTime ?? p.startTs,
+    endTime: p.endTime ?? p.startTs,
+  }));
+}
+
+/** 按地址切页面:同一次打开里重复的「跳转到同一地址」不另开大步骤 */
+function collectPages(actions: RecordedAction[]): PageRaw[] {
   const pages: PageRaw[] = [];
   let cur: PageRaw | null = null;
   for (const a of actions) {
@@ -52,23 +79,28 @@ export function buildPages(
   if (!pages.length) {
     pages.push({ url: t('unrecordedPage'), title: '', actions: [], startTs: 0, pseudo: true });
   }
+  return pages;
+}
 
-  // 页面时间窗:[startTs_i, startTs_{i+1}),请求/事件按 ts 归属页面
-  const windows = pages.map((p, i) => [p.startTs, i + 1 < pages.length ? pages[i + 1]!.startTs : Infinity] as const);
-  const pageIndexOf = (ts: number): number => {
-    for (let i = pages.length - 1; i >= 0; i--) {
-      if (ts >= windows[i]![0]) return i;
+/** 窗口起点升序,取"起点 ≤ ts 的最后一个窗口" */
+function windowIndexOf(ts: number, windows: readonly (readonly [number, number])[]): number {
+  let lo = 0;
+  let hi = windows.length - 1;
+  let found = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (windows[mid]![0] <= ts) {
+      found = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
     }
-    return 0;
-  };
+  }
+  return found;
+}
 
-  const buckets: TimelineEntry[][] = pages.map(() => []);
-  for (const a of actions) buckets[pageIndexOf(a.ts)]!.push({ type: 'action', ts: a.ts, data: a, ownerStepIdx: -1 });
-  for (const r of requests) buckets[pageIndexOf(r.ts)]!.push({ type: 'request', ts: r.ts, data: r, ownerStepIdx: -1 });
-  for (const ev of piniaEvents) buckets[pageIndexOf(ev.ts)]!.push({ type: 'pinia', ts: ev.ts, data: ev, ownerStepIdx: -1 });
-  for (const log of logs) buckets[pageIndexOf(log.ts)]!.push({ type: 'log', ts: log.ts, data: log, ownerStepIdx: -1 });
-  for (const note of notes) buckets[pageIndexOf(note.ts)]!.push({ type: 'note', ts: note.ts, data: note, ownerStepIdx: -1 });
-
+/** 排序、归属(ownerStepIdx)、时间窗,并丢弃没有条目的前置伪页面 */
+function finalizePages(pages: PageRaw[], buckets: TimelineEntry[][]): void {
   const TYPE_ORDER: Record<TimelineEntry['type'], number> = { action: 0, note: 1, pinia: 2, log: 3, request: 4 };
   pages.forEach((p, i) => {
     const entries = buckets[i]!.sort((x, y) => x.ts - y.ts || TYPE_ORDER[x.type] - TYPE_ORDER[y.type]);
@@ -91,14 +123,6 @@ export function buildPages(
 
   // 前置伪页面:没有条目时丢弃
   while (pages.length && pages[0]!.pseudo && !pages[0]!.entries!.length) pages.shift();
-  return pages.map((p, i) => ({
-    ...p,
-    key: `p${i}`,
-    orderIndex: i + 1,
-    entries: p.entries ?? [],
-    startTime: p.startTime ?? p.startTs,
-    endTime: p.endTime ?? p.startTs,
-  }));
 }
 
 /** 事件归属到「不晚于它的最后一条步骤」。只留下归属步骤已被勾选的事件。 */
@@ -168,16 +192,32 @@ function captureNarrowed(view: CaptureView): boolean {
   return !view.isClickShown || !view.isKeyboardShown || !view.isShotShown || !view.isVueShown || !view.isConsoleShown || !view.isRequestShown;
 }
 
+/** 非 action 条目 → 对应的开关;note 永远显示 */
+const ENTRY_FLAGS: Partial<Record<TimelineEntry['type'], (view: CaptureView) => boolean>> = {
+  log: (v) => v.isConsoleShown,
+  request: (v) => v.isRequestShown,
+  pinia: (v) => v.isVueShown,
+  note: () => true,
+};
+
+/** action 细分类型 → 对应的开关。navigate 命中后即返回,不再看补充信号。 */
+type ActionMatcher = (action: RecordedAction, view: CaptureView) => boolean;
+const ACTION_MATCH: Partial<Record<ActionKind, ActionMatcher>> = {
+  navigate: (a, v) => !captureNarrowed(v) || !!(a.screenshot && v.isShotShown),
+  click: (_a, v) => v.isClickShown,
+  input: (_a, v) => v.isKeyboardShown,
+  keypress: (_a, v) => v.isKeyboardShown,
+  submit: (_a, v) => v.isKeyboardShown,
+};
+
 export function entryMatchesCapture(entry: TimelineEntry, view: CaptureView = SHOW_ALL_CAPTURE): boolean {
-  if (entry.type === 'log') return view.isConsoleShown;
-  if (entry.type === 'request') return view.isRequestShown;
-  if (entry.type === 'pinia') return view.isVueShown;
-  if (entry.type === 'note') return true;
-  if (entry.type !== 'action') return true;
+  if (entry.type !== 'action') {
+    const flag = ENTRY_FLAGS[entry.type];
+    return flag ? flag(view) : true;
+  }
   const action = entry.data;
-  if (action.kind === 'navigate') return !captureNarrowed(view) || !!(action.screenshot && view.isShotShown);
-  if (action.kind === 'click' && view.isClickShown) return true;
-  if ((action.kind === 'input' || action.kind === 'keypress' || action.kind === 'submit') && view.isKeyboardShown) return true;
+  if (ACTION_MATCH[action.kind]?.(action, view)) return true;
+  // 截图 / 组件信息属于补充信号:对应开关打开时就显示
   if (action.screenshot && view.isShotShown) return true;
   if (action.vue && action.vue.component && view.isVueShown) return true;
   return false;

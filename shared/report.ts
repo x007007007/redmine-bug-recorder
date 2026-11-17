@@ -1,7 +1,7 @@
 // Redmine issue 描述生成:按页面(大步骤)分组,页面内操作与 API/Pinia 事件按时间线交错。
 // 描述始终按时间正序排列(复现步骤必须按先后),UI 中的排序/过滤只影响视图。
 
-import { fmtTime, fmtClock, clip, shortUrl, describeAction, describeElement, describeLog, describePiniaEvent } from './describe';
+import { fmtTime, fmtClock, clip, shortUrl, describeAction, describeElement, describeLog, describePiniaEvent, frameLabel } from './describe';
 import { t } from './i18n';
 import { buildPages, computePropsDiffs } from './timeline';
 import { planShotUploads } from './shots';
@@ -110,7 +110,7 @@ function appendReqBody(lines: string[], r: RequestEntry): void {
 function appendVueLines(lines: string[], a: RecordedAction, propsDiffs: Map<number | undefined, { changes: string[] }>): void {
   if (!a.vue || !a.vue.component) return;
   const chain = a.vue.chain && a.vue.chain.length > 1 ? `(${a.vue.chain.join(' > ')})` : '';
-  lines.push(t('reportVue', [a.vue.component, chain]));
+  lines.push(t('reportFrame', [frameLabel(a.vue), a.vue.component, chain]));
   if (a.vue.props) lines.push(t('reportProps', clip(a.vue.props, 600)));
   const pd = propsDiffs.get(a.id);
   if (pd && pd.changes.length) {

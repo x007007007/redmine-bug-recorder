@@ -40,7 +40,7 @@ const entries = [
   },
   { in: 'content/console-hook.ts', out: 'content/console-hook.js', format: 'iife' },
   { in: 'content/recorder.ts', out: 'content/recorder.js', format: 'iife' },
-  { in: 'content/vue-probe.ts', out: 'content/vue-probe.js', format: 'iife' },
+  { in: 'content/framework-probe.ts', out: 'content/framework-probe.js', format: 'iife' },
   { in: 'popup/popup.ts', out: 'popup/popup.js', format: 'esm' },
   { in: 'manager/manager.ts', out: 'manager/manager.js', format: 'esm' },
   { in: 'devtools/devtools.ts', out: 'devtools/devtools.js', format: 'iife' },

@@ -1,6 +1,6 @@
 // 时间线条目行构建:操作行(勾选/截图+点击标记/删除)、API 行(可展开请求/响应体)、Pinia 行。
 
-import { fmtClock, describeAction, describeLog, describeNote, describePiniaEvent } from '../shared/describe';
+import { fmtClock, describeAction, describeLog, describeNote, describePiniaEvent, frameLabel } from '../shared/describe';
 import { t } from '../shared/i18n';
 import { shortenUrl } from './dom';
 import type { ChangeNote, LogEntry, RecordedAction, PiniaEvent, RequestEntry } from '../shared/types';
@@ -103,7 +103,7 @@ function buildBadges(a: RecordedAction, propsDiff?: { changes: string[] }): HTML
   if (a.vue.component) {
     const comp = document.createElement('span');
     comp.className = 'badge vue';
-    comp.textContent = `Vue: ${a.vue.component}`;
+    comp.textContent = `${frameLabel(a.vue)}: ${a.vue.component}`;
     comp.title = a.vue.chain && a.vue.chain.length > 1 ? t('vueChain', a.vue.chain.join(' > ')) : '';
     wrap.appendChild(comp);
   }

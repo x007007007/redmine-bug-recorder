@@ -4,7 +4,7 @@ import { t } from '../shared/i18n';
 import { entryVisible, type CaptureView, type ListOrigin } from '../shared/timeline';
 import { shortenUrl } from '../manager/dom';
 import { describeAction, describeLog, describeNote, describePiniaEvent } from '../shared/describe';
-import type { PageGroup } from '../shared/types';
+import type { PageGroup, TimelineEntry } from '../shared/types';
 
 export const PAGE_SIZE = 5;
 
@@ -98,33 +98,8 @@ function buildRow(p: PageGroup, opts: PageRenderOpts): PageRow {
   for (const e of p.entries) {
     if (!entryVisible(e, opts.listOrigin, opts.captureView)) continue;
     const div = document.createElement('div');
-    div.className =
-      'en' +
-      (e.type === 'request'
-        ? ' req'
-        : e.type === 'pinia'
-          ? ' pin'
-          : e.type === 'log'
-            ? e.data.level === 'warning'
-              ? ' log warn'
-              : e.data.level === 'error'
-                ? ' log err'
-                : ' log info'
-            : e.type === 'note'
-              ? ' note'
-              : '');
-    div.textContent =
-      clockOf(e.ts) +
-      ' ' +
-      (e.type === 'action'
-        ? describeAction(e.data)
-        : e.type === 'request'
-          ? `API ${e.data.method} ${shortenUrl(e.data.url, 60)} → ${e.data.error || e.data.status || '?'}`
-          : e.type === 'log'
-            ? describeLog(e.data)
-            : e.type === 'note'
-              ? describeNote(e.data)
-              : 'Pinia ' + describePiniaEvent(e.data));
+    div.className = 'en' + entryClass(e);
+    div.textContent = clockOf(e.ts) + ' ' + entryText(e);
     entries.appendChild(div);
   }
   row.appendChild(entries);
@@ -134,4 +109,36 @@ function buildRow(p: PageGroup, opts: PageRenderOpts): PageRow {
     row.classList.add('open');
   };
   return row;
+}
+
+/** 条目样式类:API / Pinia / Console(按级别) / 意见 */
+function entryClass(e: TimelineEntry): string {
+  switch (e.type) {
+    case 'request':
+      return ' req';
+    case 'pinia':
+      return ' pin';
+    case 'note':
+      return ' note';
+    case 'log':
+      return e.data.level === 'error' ? ' log err' : e.data.level === 'warning' ? ' log warn' : ' log info';
+    default:
+      return '';
+  }
+}
+
+/** 条目正文:操作文案 / API 摘要 / 日志 / 意见 / Pinia */
+function entryText(e: TimelineEntry): string {
+  switch (e.type) {
+    case 'action':
+      return describeAction(e.data);
+    case 'request':
+      return `API ${e.data.method} ${shortenUrl(e.data.url, 60)} → ${e.data.error || e.data.status || '?'}`;
+    case 'log':
+      return describeLog(e.data);
+    case 'note':
+      return describeNote(e.data);
+    default:
+      return 'Pinia ' + describePiniaEvent(e.data);
+  }
 }

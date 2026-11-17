@@ -23,3 +23,7 @@ release/
 node_modules/
 dist/
 *.tsbuildinfo
+
+# 本地一键测试环境产物
+.dev-firefox/
+.dev-profile/

@@ -26,6 +26,7 @@ A browser extension (Chrome MV3 / Firefox MV3) for testers: it records UI steps 
   - 每个操作标注所在 Vue 组件(名称 + 组件链,如 `AddOrderForm (AddOrderForm > OrderApp)`)
   - 组件 props 点击时刻快照,并与上次同组件 diff:`title: "" → "三体"`
   - Pinia:`$subscribe` 记录状态变更流(哪个 store / 哪些 key)、`$onAction` 记录 action 调用、每次操作对比 store 快照
+- **React 识别**:React 17+/16 页面经 fiber(`__reactFiber$*`)取组件名与组件链,props 快照同源(不涉及 Redux 状态流)
 - **步骤勾选 + review 后提交**:值原样记录(不做脱敏),测试人员在管理页勾选要提交的步骤、可编辑描述后,才上传截图并创建 issue(Redmine 描述中的步骤始终按时间正序)
 - **提交范围**:默认只取**最近 100 步**;DevTools 面板可在时间轴上框选区间,提交页按区间裁剪(可"查看全部 / 恢复默认")
 - **截图限量**:提交时"最多附加截图 N 张"(超出取最近),避免 issue 附件爆炸
@@ -158,19 +159,24 @@ npm run release   # tsc 检查 → 构建 → 产出 release/ 下两个包:
 ## 本地联调 / 测试
 
 ```bash
-# 两个终端分别启动(假 Redmine 的 API Key 固定为 test-key)
-python3 demo/server.py          # 演示应用 http://127.0.0.1:8123(登录 demo/demo123)
-python3 demo/server.py redmine  # 假 Redmine http://127.0.0.1:8124
+# 一键启动(自动构建 + 双 demo 服务器 + 浏览器加载扩展):
+npm run dev:chrome    # Chrome for Testing(自动发现本机缓存,预置开发者模式)
+npm run dev:firefox   # Firefox(web-ext 加载,改码热重载)
+npm run dev:both      # 两个都起
+# 选项:--no-build 跳过构建;--page URL 追加页面;--cdp-port=9223 开 CDP 调试口
+# 手动等效:python3 demo/server.py(8123 演示应用)+ python3 demo/server.py redmine(8124 假 Redmine,API Key 固定 test-key)
 
-# 端到端冒烟(需 Node ≥ 21;加载 dist/,默认用本机 Playwright 缓存的 Chrome for Testing)
-CFT="$HOME/Library/Caches/ms-playwright/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
-"$CFT" --headless=new --remote-debugging-port=9223 --user-data-dir=/tmp/bugrec-profile \
-  --no-first-run "--disable-extensions-except=$PWD/dist" "--load-extension=$PWD/dist" about:blank &
-sleep 4
+# 端到端冒烟(需 Node ≥ 21;先 npm run dev:chrome -- --cdp-port=9223 再跑):
 node tools/cdp_smoke.mjs 9223 bkeogdmbgodhopooimgmbacldmdmpeap "$PWD"
 ```
 
-最近一次全量结果:**50/50 PASS**(TS 构建产物;含 Vue 组件名、props diff、Pinia 事件、步骤勾选/删除、
+注意:
+- **品牌版 Google Chrome ≥137 已移除 `--load-extension`**(扩展会被"Chromium 屏蔽"),一键脚本自动改用本机缓存的
+  Chrome for Testing(134/149 实测可用)或 Chromium/Dev 渠道;若都没有,装一个:`npx @puppeteer/browsers install chrome@stable`
+- 命令行加载的未打包扩展需要**开发者模式**开启才会运行,一键脚本已自动预置到专用 profile(`.dev-profile/`,不影响日常浏览器)
+- 冒烟测试每轮自动清空 `demo/.fake-redmine/`,可重复执行
+
+最近一次全量结果:**49/49 PASS**(TS 构建产物;含 Vue 组件名、props diff、Pinia 事件、步骤勾选/删除、
 排序/搜索/折叠、截图限量、PNG 点击标记、CSV 下载、DevTools 面板会话列表/勾选同步/删除会话/选区、提交 Redmine 全链路)。
 
 ## 隐私与安全
@@ -181,7 +187,8 @@ node tools/cdp_smoke.mjs 9223 bkeogdmbgodhopooimgmbacldmdmpeap "$PWD"
 
 ## 已知限制
 
-- Vue 组件名/props 依赖 `el.__vueParentComponent`:**dev/Vite 构建 100% 可用;生产构建不保证**(自动降级为普通步骤,Pinia 捕获不受影响)
+- Vue 组件名/props 依赖 `el.__vueParentComponent`:**dev/Vite 构建 100% 可用;生产构建降级**——探针沿祖先找 `__vue_app__` 至少报根组件名并保持 Pinia 捕获,但组件链/props 取不到(Vue 生产构建不暴露组件实例)
+- React 组件名/props 经 fiber 内部字段读取,React 大版本升级(17/18/19 均验证过 key 名)或未来内部结构调整时可能失效,失效时自动降级为普通步骤
 - 响应体与 Console 捕获仅 Chrome(Firefox 无 chrome.debugger);二进制响应不落库
 - `captureVisibleTab` 要求 `<all_urls>` 权限(已声明);浏览器受保护页面(chrome:// 等)无法截图,自动跳过
 - 键盘输入按 700ms 防抖合并为一条"输入"步骤;回车单独记一步

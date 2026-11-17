@@ -3,7 +3,7 @@
 import { fmtClock, describeAction, describeElement, describeLog, describePiniaEvent, shortUrl, clip } from '../shared/describe';
 import { t } from '../shared/i18n';
 import { buildPages } from '../shared/timeline';
-import type { PageGroup, SessionDetail, TimelineEntry } from '../shared/types';
+import type { ChangeNote, LogEntry, PageGroup, PiniaEvent, RecordedAction, RequestEntry, SessionDetail, TimelineEntry } from '../shared/types';
 
 function headers(): string[] {
   return [
@@ -11,7 +11,7 @@ function headers(): string[] {
     t('csvStepCol'),
     t('csvType'),
     t('csvContent'),
-    t('csvVue'),
+    t('csvComponent'),
     t('csvSelector'),
     t('csvValue'),
     t('csvStatus'),
@@ -47,11 +47,18 @@ function csvRow(p: PageGroup, e: TimelineEntry, numOf: Map<number, number>): str
   const ts = fmtClock(e.ts);
   const page = p.pseudo ? t('csvBefore') : `#${p.orderIndex} ${shortUrl(p.url, 60)}`;
   const stepCol = e.type === 'action' && numOf.has(e.data.id!) ? t('csvStep', String(numOf.get(e.data.id!))) : '';
-  if (e.type === 'action') {
-    const a = e.data;
+  const tail: string[] = [ts, stepCol];
+  const body = CSV_ROW_BY_TYPE[e.type]?.(e.data, page) ?? [];
+  return [...tail, ...body];
+}
+
+type CsvBody = (data: TimelineEntry['data'], page: string) => string[];
+
+/** 各类条目的 [类型, 内容, 组件, 选择器, 值, 状态] 片段;页尾两列由调用方拼 */
+const CSV_ROW_BY_TYPE: Record<TimelineEntry['type'], CsvBody> = {
+  action: (data, page) => {
+    const a = data as RecordedAction;
     return [
-      ts,
-      stepCol,
       t('csvAction'),
       describeAction(a),
       (a.vue && a.vue.component) || '',
@@ -61,12 +68,10 @@ function csvRow(p: PageGroup, e: TimelineEntry, numOf: Map<number, number>): str
       page,
       shotBase64(a),
     ];
-  }
-  if (e.type === 'request') {
-    const r = e.data;
+  },
+  request: (data, page) => {
+    const r = data as RequestEntry;
     return [
-      ts,
-      '',
       'API',
       `${r.method} ${shortUrl(r.url, 100)}`,
       '',
@@ -76,11 +81,17 @@ function csvRow(p: PageGroup, e: TimelineEntry, numOf: Map<number, number>): str
       page,
       '',
     ];
-  }
-  if (e.type === 'log') return [ts, '', 'Console', describeLog(e.data), '', '', '', e.data.level, page, ''];
-  if (e.type === 'note') return [ts, '', t('csvNote'), `${describeElement(e.data)} → ${e.data.opinion}`, '', e.data.selector, e.data.opinion, '', page, ''];
-  return [ts, '', 'Pinia', describePiniaEvent(e.data), '', '', '', '', page, ''];
-}
+  },
+  log: (data, page) => {
+    const l = data as LogEntry;
+    return ['Console', describeLog(l), '', '', '', l.level, page, ''];
+  },
+  note: (data, page) => {
+    const n = data as ChangeNote;
+    return [t('csvNote'), `${describeElement(n)} → ${n.opinion}`, '', n.selector, n.opinion, '', page, ''];
+  },
+  pinia: (data, page) => ['Pinia', describePiniaEvent(data as PiniaEvent), '', '', '', '', page, ''],
+};
 
 function shotBase64(a: { screenshot?: string }): string {
   if (!a.screenshot) return '';

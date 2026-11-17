@@ -12,14 +12,20 @@ export interface Viewport {
   h: number;
 }
 
-/** 主世界探针返回的 Vue 信息(扁平结构) */
-export interface VueInfo {
+/** 主世界探针返回的组件信息(Vue/React 通用;落库字段沿用 vue 名,旧数据兼容) */
+export interface FrameInfo {
+  /** 实际识别到的框架;历史数据无该字段时按 Vue 处理 */
+  framework?: 'vue' | 'react' | null;
   component: string | null;
   chain: string[];
   props: string | null;
+  /** 仅 Vue/Pinia 场景;React 下为空数组 */
   piniaChanges: PiniaChange[];
   error?: string;
 }
+
+/** 旧名兼容 */
+export type VueInfo = FrameInfo;
 
 export interface PiniaChange {
   storeId: string;
@@ -43,7 +49,7 @@ export interface RecordedAction {
   href?: string;
   inputType?: string;
   key?: string;
-  vue?: VueInfo | null;
+  vue?: FrameInfo | null;
   point?: ClickPoint;
   viewport?: Viewport;
   screenshot?: string;
@@ -98,7 +104,7 @@ export interface ChangeNote {
   selector: string;
   label: string;
   htmlHint: string;
-  vue?: VueInfo | null;
+  vue?: FrameInfo | null;
   opinion: string;
 }
 
@@ -109,7 +115,7 @@ export interface NoteDraft {
   selector: string;
   label: string;
   htmlHint: string;
-  vue: VueInfo | null;
+  vue: FrameInfo | null;
 }
 
 export const NOTE_DRAFT_KEY = 'bugrec.noteDraft';
