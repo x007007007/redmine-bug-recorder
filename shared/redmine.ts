@@ -142,6 +142,8 @@ export interface RedmineProject {
   id: number;
   name: string;
   identifier?: string;
+  /** 父项目 id;/projects.json 自带 parent 对象,用于层级展示 */
+  parentId?: number;
 }
 
 /**
@@ -192,8 +194,46 @@ async function listProjectsByPage(settings: Partial<RecorderSettings>): Promise<
 }
 
 function mapProjects(data: unknown): RedmineProject[] {
-  const list = (data as { projects?: { id: number; name: string; identifier?: string }[] } | null)?.projects || [];
-  return list.map((project) => ({ id: project.id, name: project.name, identifier: project.identifier }));
+  const list =
+    (data as {
+      projects?: { id: number; name: string; identifier?: string; parent?: { id: number } }[];
+    } | null)?.projects || [];
+  return list.map((project) => ({
+    id: project.id,
+    name: project.name,
+    identifier: project.identifier,
+    ...(project.parent?.id ? { parentId: project.parent.id } : {}),
+  }));
+}
+
+/**
+ * 项目列表按层级排序:父项目在前,子项目紧随其后并带缩进深度。
+ * 父项目不在本页(深层链)或环引用的按顶层处理;兜底保证一个不少。
+ */
+export function orderedProjects(projects: RedmineProject[]): { project: RedmineProject; depth: number }[] {
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const childrenOf = new Map<number | undefined, RedmineProject[]>();
+  for (const p of projects) {
+    const key = p.parentId != null && byId.has(p.parentId) ? p.parentId : undefined;
+    const list = childrenOf.get(key);
+    if (list) list.push(p);
+    else childrenOf.set(key, [p]);
+  }
+  const out: { project: RedmineProject; depth: number }[] = [];
+  const seen = new Set<number>();
+  const walk = (key: number | undefined, depth: number): void => {
+    for (const p of childrenOf.get(key) || []) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      out.push({ project: p, depth });
+      walk(p.id, depth + 1);
+    }
+  };
+  walk(undefined, 0);
+  for (const p of projects) {
+    if (!seen.has(p.id)) out.push({ project: p, depth: 0 });
+  }
+  return out;
 }
 
 async function projectsFromMemberships(settings: Partial<RecorderSettings>): Promise<RedmineProject[]> {

@@ -1,0 +1,35 @@
+# 本地 Redmine 测试服务(供 redmine-bug-recorder 插件端到端联调)。
+# 启动: docker compose up -d        停止: docker compose down
+# 彻底清空数据: docker compose down -v && rm -rf data
+# 说明: 3000 端口在本机已被占用,映射到宿主机 13000。
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: redmine
+      POSTGRES_PASSWORD: redmine
+      POSTGRES_DB: redmine
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U redmine -d redmine']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  redmine:
+    image: redmine:6.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      REDMINE_DB_POSTGRES: db
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: redmine
+      REDMINE_DB_DATABASE: redmine
+    ports:
+      - '13000:3000'
+    volumes:
+      - ./data/files:/usr/src/redmine/files

@@ -27,3 +27,7 @@ dist/
 # 本地一键测试环境产物
 .dev-firefox/
 .dev-profile/
+
+# 本地 Redmine 测试服务(service-redminbugrecorder)
+service-redminbugrecorder/.env
+service-redminbugrecorder/data/

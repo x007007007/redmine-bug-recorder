@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dataUrlToBytes, listProjects, normalizeBase, testConnection, uploadAttachment } from '../shared/redmine';
+import { dataUrlToBytes, listProjects, normalizeBase, orderedProjects, testConnection, uploadAttachment } from '../shared/redmine';
 
 test('站点根地址去掉页面路径、查询串，并补上协议', () => {
   assert.equal(normalizeBase(''), '');
@@ -83,4 +83,54 @@ test('Redmine HTTP 回退：401 改走 key，附件 404 改走 /uploads，错误
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test('项目列表解析出父项目(parent),orderedProjects 父在前、子缩进一级', async () => {
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async (input) => {
+      if (String(input).includes('/projects.json')) {
+        return Response.json({
+          total_count: 4,
+          projects: [
+            { id: 2, name: '前端模块', identifier: 'demo-frontend', parent: { id: 1, name: '演示系统' } },
+            { id: 1, name: '演示系统', identifier: 'demo-system' },
+            { id: 4, name: '移动端', identifier: 'demo-mobile', parent: { id: 1, name: '演示系统' } },
+            { id: 3, name: '后端模块', identifier: 'demo-backend', parent: { id: 1, name: '演示系统' } },
+          ],
+        });
+      }
+      return new Response('missing', { status: 404 });
+    };
+    const projects = await listProjects({ redmineUrl: 'https://redmine.example.com', apiKey: 'k' });
+    // 无父项目的对象不带 parentId 字段(保持旧结构一致)
+    assert.deepEqual(projects[1], { id: 1, name: '演示系统', identifier: 'demo-system' });
+    assert.equal(projects[0]!.parentId, 1);
+
+    const ordered = orderedProjects(projects);
+    assert.deepEqual(
+      ordered.map(({ project, depth }) => [project.identifier, depth]),
+      [
+        ['demo-system', 0],
+        ['demo-frontend', 1],
+        ['demo-mobile', 1],
+        ['demo-backend', 1],
+      ]
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('orderedProjects:父不在列表视为顶层,环引用不丢项目', () => {
+  const projects = [
+    { id: 1, name: 'A', parentId: 2 }, // 环
+    { id: 2, name: 'B', parentId: 1 }, // 环
+    { id: 3, name: 'C', parentId: 99 }, // 父不在本页
+    { id: 4, name: 'D' },
+  ];
+  const ordered = orderedProjects(projects);
+  assert.equal(ordered.length, 4);
+  assert.deepEqual(ordered.map((r) => r.project.name).sort(), ['A', 'B', 'C', 'D']);
+  assert.deepEqual(ordered.map((r) => r.depth), [0, 0, 0, 0]);
 });
